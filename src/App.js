@@ -20,20 +20,21 @@ function App() {
   const [location, setLocation] = useState(null);
   const [photo, setPhoto] = useState(null);
 
-  // Mobile number popup
   const [openMobileDialog, setOpenMobileDialog] =
     useState(false);
 
   const [mobileNumber, setMobileNumber] =
     useState("");
 
-  // Loading state
   const [submitting, setSubmitting] =
     useState(false);
 
-  // Backend response
   const [responseStatus, setResponseStatus] =
     useState(null);
+
+  // Used to reset Camera component
+  const [cameraResetKey, setCameraResetKey] =
+    useState(0);
 
   // ==========================================
   // GPS LOCATION RECEIVED
@@ -67,12 +68,34 @@ function App() {
   };
 
   // ==========================================
+  // RESET AFTER SUCCESS
+  // ==========================================
+
+  const resetAttendance = () => {
+    // Close dialog
+    setOpenMobileDialog(false);
+
+    // Clear photo
+    setPhoto(null);
+
+    // Clear mobile number
+    setMobileNumber("");
+
+    // Clear backend response
+    setResponseStatus(null);
+
+    // Reset Camera component
+    setCameraResetKey(
+      (previousKey) => previousKey + 1
+    );
+  };
+
+  // ==========================================
   // SUBMIT ATTENDANCE
   // ==========================================
 
   const submitAttendance = async () => {
 
-    // Check mobile number
     if (!mobileNumber) {
       setResponseStatus({
         type: "error",
@@ -82,7 +105,6 @@ function App() {
       return;
     }
 
-    // Validate mobile number
     if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
       setResponseStatus({
         type: "error",
@@ -93,7 +115,6 @@ function App() {
       return;
     }
 
-    // Check location
     if (!location) {
       setResponseStatus({
         type: "error",
@@ -103,7 +124,6 @@ function App() {
       return;
     }
 
-    // Check photo
     if (!photo) {
       setResponseStatus({
         type: "error",
@@ -113,20 +133,11 @@ function App() {
       return;
     }
 
-    // ==========================================
-    // CREATE DATE & TIME
-    // ==========================================
-
     const now = new Date();
-
-    // ==========================================
-    // ATTENDANCE JSON
-    // ==========================================
 
     const attendanceData = {
       mobileNumber: mobileNumber,
 
-      // Uncomment when sending image
       // selfie: photo,
 
       latitude: location.latitude,
@@ -137,7 +148,6 @@ function App() {
       time: now.toLocaleTimeString("en-IN"),
     };
 
-    // Console JSON
     console.log(
       "========== FINAL ATTENDANCE =========="
     );
@@ -154,17 +164,8 @@ function App() {
       "======================================="
     );
 
-    // ==========================================
-    // START LOADING
-    // ==========================================
-
     setSubmitting(true);
-
     setResponseStatus(null);
-
-    // ==========================================
-    // AXIOS POST
-    // ==========================================
 
     try {
 
@@ -178,10 +179,6 @@ function App() {
         response.data
       );
 
-      // ========================================
-      // SUCCESS
-      // ========================================
-
       setResponseStatus({
         type: "success",
         message:
@@ -192,7 +189,6 @@ function App() {
           attendanceData,
       });
 
-      // Clear mobile number
       setMobileNumber("");
 
     } catch (error) {
@@ -201,10 +197,6 @@ function App() {
         "Attendance submission error:",
         error
       );
-
-      // ========================================
-      // ERROR RESPONSE FROM SERVER
-      // ========================================
 
       if (error.response) {
 
@@ -219,15 +211,12 @@ function App() {
 
       } else {
 
-        // ======================================
-        // NETWORK ERROR
-        // ======================================
-
         setResponseStatus({
           type: "error",
           message:
             "Unable to connect to the server.",
         });
+
       }
 
     } finally {
@@ -307,6 +296,7 @@ function App() {
               <section className="section">
 
                 <Camera
+                  key={cameraResetKey}
                   disabled={!location}
                   onPhotoTaken={
                     handlePhotoTaken
@@ -341,17 +331,15 @@ function App() {
       <Dialog
         open={openMobileDialog}
         onClose={() => {
+
           if (!submitting) {
             setOpenMobileDialog(false);
           }
+
         }}
         fullWidth
         maxWidth="xs"
       >
-
-        {/* =====================================
-            TITLE
-        ===================================== */}
 
         <DialogTitle>
 
@@ -392,15 +380,9 @@ function App() {
 
         </DialogTitle>
 
-        {/* =====================================
-            CONTENT
-        ===================================== */}
-
         <DialogContent>
 
-          {/* ===================================
-              NORMAL MOBILE FORM
-          =================================== */}
+          {/* MOBILE FORM */}
 
           {!responseStatus && (
 
@@ -440,9 +422,7 @@ function App() {
 
           )}
 
-          {/* ===================================
-              BACKEND RESPONSE
-          =================================== */}
+          {/* BACKEND RESPONSE */}
 
           {responseStatus && (
 
@@ -462,8 +442,6 @@ function App() {
               >
                 {responseStatus.message}
               </Typography>
-
-              {/* RECEIVED DATA */}
 
               {responseStatus.data && (
 
@@ -510,9 +488,7 @@ function App() {
 
         </DialogContent>
 
-        {/* =====================================
-            BUTTONS
-        ===================================== */}
+        {/* BUTTONS */}
 
         <DialogActions>
 
@@ -541,13 +517,24 @@ function App() {
 
           )}
 
+          {/* SUCCESS / ERROR CLOSE */}
+
           {responseStatus && (
 
             <Button
               variant="contained"
-              onClick={() =>
-                setOpenMobileDialog(false)
-              }
+              onClick={() => {
+
+                if (
+                  responseStatus.type ===
+                  "success"
+                ) {
+                  resetAttendance();
+                } else {
+                  setResponseStatus(null);
+                }
+
+              }}
             >
               Close
             </Button>
