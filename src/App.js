@@ -9,6 +9,8 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
+import Box from "@mui/material/Box";
 
 import axios from "axios";
 
@@ -24,6 +26,14 @@ function App() {
 
   const [mobileNumber, setMobileNumber] =
     useState("");
+
+  // Loading state
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  // Backend response
+  const [responseStatus, setResponseStatus] =
+    useState(null);
 
   // ==========================================
   // GPS LOCATION RECEIVED
@@ -50,8 +60,8 @@ function App() {
 
     setPhoto(image);
 
-    // Open Material UI popup
     if (image) {
+      setResponseStatus(null);
       setOpenMobileDialog(true);
     }
   };
@@ -64,27 +74,42 @@ function App() {
 
     // Check mobile number
     if (!mobileNumber) {
-      alert("Please enter mobile number.");
+      setResponseStatus({
+        type: "error",
+        message: "Please enter mobile number.",
+      });
+
       return;
     }
 
     // Validate mobile number
     if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
-      alert(
-        "Please enter a valid 10 digit mobile number."
-      );
+      setResponseStatus({
+        type: "error",
+        message:
+          "Please enter a valid 10 digit mobile number.",
+      });
+
       return;
     }
 
     // Check location
     if (!location) {
-      alert("Location is not ready.");
+      setResponseStatus({
+        type: "error",
+        message: "Location is not ready.",
+      });
+
       return;
     }
 
     // Check photo
     if (!photo) {
-      alert("Please take your selfie.");
+      setResponseStatus({
+        type: "error",
+        message: "Please take your selfie.",
+      });
+
       return;
     }
 
@@ -101,8 +126,7 @@ function App() {
     const attendanceData = {
       mobileNumber: mobileNumber,
 
-      // Uncomment this when you want
-      // to send the image also.
+      // Uncomment when sending image
       // selfie: photo,
 
       latitude: location.latitude,
@@ -113,10 +137,7 @@ function App() {
       time: now.toLocaleTimeString("en-IN"),
     };
 
-    // ==========================================
-    // SHOW JSON IN CONSOLE
-    // ==========================================
-
+    // Console JSON
     console.log(
       "========== FINAL ATTENDANCE =========="
     );
@@ -134,31 +155,45 @@ function App() {
     );
 
     // ==========================================
+    // START LOADING
+    // ==========================================
+
+    setSubmitting(true);
+
+    setResponseStatus(null);
+
+    // ==========================================
     // AXIOS POST
     // ==========================================
 
     try {
 
       const response = await axios.post(
-        "http://localhost:5000/api/attendance",
+        "https://attendance-backend-hs75.onrender.com/api/attendance",
         attendanceData
       );
 
-      // Backend response
       console.log(
         "Backend response:",
         response.data
       );
 
-      // Close popup
-      setOpenMobileDialog(false);
+      // ========================================
+      // SUCCESS
+      // ========================================
+
+      setResponseStatus({
+        type: "success",
+        message:
+          response.data.message ||
+          "Attendance submitted successfully.",
+        data:
+          response.data.data ||
+          attendanceData,
+      });
 
       // Clear mobile number
       setMobileNumber("");
-
-      alert(
-        "Attendance submitted successfully!"
-      );
 
     } catch (error) {
 
@@ -167,19 +202,38 @@ function App() {
         error
       );
 
-      // Backend error response
+      // ========================================
+      // ERROR RESPONSE FROM SERVER
+      // ========================================
+
       if (error.response) {
 
-        console.error(
-          "Server response:",
-          error.response.data
-        );
+        setResponseStatus({
+          type: "error",
+          message:
+            error.response.data?.message ||
+            "Server returned an error.",
+          data:
+            error.response.data,
+        });
 
+      } else {
+
+        // ======================================
+        // NETWORK ERROR
+        // ======================================
+
+        setResponseStatus({
+          type: "error",
+          message:
+            "Unable to connect to the server.",
+        });
       }
 
-      alert(
-        "Unable to submit attendance. Please try again."
-      );
+    } finally {
+
+      setSubmitting(false);
+
     }
   };
 
@@ -192,9 +246,7 @@ function App() {
 
       <div className="attendance-card">
 
-        {/* =====================================
-            HEADER
-        ===================================== */}
+        {/* HEADER */}
 
         <header className="header">
 
@@ -208,9 +260,7 @@ function App() {
 
         </header>
 
-        {/* =====================================
-            GPS
-        ===================================== */}
+        {/* GPS */}
 
         <div className="main_section">
 
@@ -250,9 +300,7 @@ function App() {
 
             )}
 
-            {/* =====================================
-                CAMERA
-            ===================================== */}
+            {/* CAMERA */}
 
             {location && (
 
@@ -273,9 +321,7 @@ function App() {
 
         </div>
 
-        {/* =====================================
-            FOOTER
-        ===================================== */}
+        {/* FOOTER */}
 
         <footer>
 
@@ -289,77 +335,224 @@ function App() {
       </div>
 
       {/* =========================================
-          MATERIAL UI MOBILE NUMBER POPUP
+          MATERIAL UI DIALOG
       ========================================= */}
 
       <Dialog
         open={openMobileDialog}
-        onClose={() =>
-          setOpenMobileDialog(false)
-        }
+        onClose={() => {
+          if (!submitting) {
+            setOpenMobileDialog(false);
+          }
+        }}
         fullWidth
         maxWidth="xs"
       >
 
-        {/* TITLE */}
+        {/* =====================================
+            TITLE
+        ===================================== */}
 
         <DialogTitle>
-          Submit Attendance
+
+          {responseStatus ? (
+
+            responseStatus.type ===
+            "success" ? (
+
+              <Typography
+                variant="h6"
+                sx={{
+                  color: "green",
+                  fontWeight: "bold",
+                }}
+              >
+                ✓ Attendance Successful
+              </Typography>
+
+            ) : (
+
+              <Typography
+                variant="h6"
+                sx={{
+                  color: "red",
+                  fontWeight: "bold",
+                }}
+              >
+                ✕ Submission Failed
+              </Typography>
+
+            )
+
+          ) : (
+
+            "Submit Attendance"
+
+          )}
+
         </DialogTitle>
 
-        {/* CONTENT */}
+        {/* =====================================
+            CONTENT
+        ===================================== */}
 
         <DialogContent>
 
-          <p>
-            Enter your mobile number to
-            complete attendance.
-          </p>
+          {/* ===================================
+              NORMAL MOBILE FORM
+          =================================== */}
 
-          <TextField
-            autoFocus
-            fullWidth
-            label="Mobile Number"
-            placeholder="Enter 10 digit mobile number"
-            type="tel"
-            value={mobileNumber}
-            onChange={(e) => {
+          {!responseStatus && (
 
-              const value =
-                e.target.value.replace(
-                  /\D/g,
-                  ""
-                );
+            <>
+              <Typography
+                variant="body2"
+                sx={{ mb: 1 }}
+              >
+                Enter your mobile number to
+                complete attendance.
+              </Typography>
 
-              setMobileNumber(value);
+              <TextField
+                autoFocus
+                fullWidth
+                label="Mobile Number"
+                placeholder="Enter 10 digit mobile number"
+                type="tel"
+                value={mobileNumber}
+                onChange={(e) => {
 
-            }}
-            inputProps={{
-              maxLength: 10,
-            }}
-            margin="normal"
-          />
+                  const value =
+                    e.target.value.replace(
+                      /\D/g,
+                      ""
+                    );
+
+                  setMobileNumber(value);
+
+                }}
+                inputProps={{
+                  maxLength: 10,
+                }}
+                margin="normal"
+              />
+            </>
+
+          )}
+
+          {/* ===================================
+              BACKEND RESPONSE
+          =================================== */}
+
+          {responseStatus && (
+
+            <Box>
+
+              <Typography
+                variant="body1"
+                sx={{
+                  fontWeight: "bold",
+                  mb: 2,
+                  color:
+                    responseStatus.type ===
+                    "success"
+                      ? "green"
+                      : "red",
+                }}
+              >
+                {responseStatus.message}
+              </Typography>
+
+              {/* RECEIVED DATA */}
+
+              {responseStatus.data && (
+
+                <Box
+                  sx={{
+                    backgroundColor:
+                      "#f5f5f5",
+                    padding: 2,
+                    borderRadius: 2,
+                  }}
+                >
+
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ mb: 1 }}
+                  >
+                    Data Received
+                  </Typography>
+
+                  <pre
+                    style={{
+                      margin: 0,
+                      whiteSpace:
+                        "pre-wrap",
+                      wordBreak:
+                        "break-word",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {JSON.stringify(
+                      responseStatus.data,
+                      null,
+                      2
+                    )}
+                  </pre>
+
+                </Box>
+
+              )}
+
+            </Box>
+
+          )}
 
         </DialogContent>
 
-        {/* BUTTONS */}
+        {/* =====================================
+            BUTTONS
+        ===================================== */}
 
         <DialogActions>
 
-          <Button
-            onClick={() =>
-              setOpenMobileDialog(false)
-            }
-          >
-            Cancel
-          </Button>
+          {!responseStatus && (
 
-          <Button
-            variant="contained"
-            onClick={submitAttendance}
-          >
-            Submit
-          </Button>
+            <>
+              <Button
+                onClick={() =>
+                  setOpenMobileDialog(false)
+                }
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                variant="contained"
+                onClick={submitAttendance}
+                disabled={submitting}
+              >
+                {submitting
+                  ? "Submitting..."
+                  : "Submit"}
+              </Button>
+            </>
+
+          )}
+
+          {responseStatus && (
+
+            <Button
+              variant="contained"
+              onClick={() =>
+                setOpenMobileDialog(false)
+              }
+            >
+              Close
+            </Button>
+
+          )}
 
         </DialogActions>
 
