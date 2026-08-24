@@ -11,10 +11,6 @@ function Camera({ disabled, onPhotoTaken }) {
   const [photo, setPhoto] = useState(null);
   const [error, setError] = useState("");
 
-  // ==========================================
-  // OPEN CAMERA
-  // ==========================================
-
   const openCamera = async () => {
     if (disabled) return;
 
@@ -22,7 +18,6 @@ function Camera({ disabled, onPhotoTaken }) {
       setCameraLoading(true);
       setError("");
 
-      // Stop old stream if exists
       if (streamRef.current) {
         streamRef.current
           .getTracks()
@@ -55,10 +50,6 @@ function Camera({ disabled, onPhotoTaken }) {
     }
   };
 
-  // ==========================================
-  // ATTACH STREAM TO VIDEO
-  // ==========================================
-
   useEffect(() => {
     if (
       cameraOn &&
@@ -69,10 +60,6 @@ function Camera({ disabled, onPhotoTaken }) {
         streamRef.current;
     }
   }, [cameraOn]);
-
-  // ==========================================
-  // TAKE PHOTO
-  // ==========================================
 
   const takePhoto = () => {
     const video = videoRef.current;
@@ -88,7 +75,6 @@ function Camera({ disabled, onPhotoTaken }) {
       return;
     }
 
-    // Use actual camera resolution
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
@@ -109,21 +95,10 @@ function Camera({ disabled, onPhotoTaken }) {
       0.9
     );
 
-    // Save captured image
     setPhoto(image);
 
-    // Send to parent
-    if (onPhotoTaken) {
-      onPhotoTaken(image);
-    }
-
-    // Stop camera
     stopCamera();
   };
-
-  // ==========================================
-  // STOP CAMERA
-  // ==========================================
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -141,10 +116,6 @@ function Camera({ disabled, onPhotoTaken }) {
     setCameraOn(false);
   };
 
-  // ==========================================
-  // RETAKE
-  // ==========================================
-
   const retakePhoto = () => {
     setPhoto(null);
 
@@ -152,35 +123,19 @@ function Camera({ disabled, onPhotoTaken }) {
       onPhotoTaken(null);
     }
 
-    // Give React time to remove preview
     setTimeout(() => {
       openCamera();
     }, 100);
   };
 
-  // ==========================================
-  // SUBMIT
-  // ==========================================
-
+  // SEND PHOTO TO APP
   const submitPhoto = () => {
     if (!photo) return;
 
-    console.log("Photo submitted:", photo);
-
-    /*
-      Send photo to backend here.
-
-      Example:
-
-      axios.post("/api/attendance", {
-        image: photo
-      });
-    */
+    if (onPhotoTaken) {
+      onPhotoTaken(photo);
+    }
   };
-
-  // ==========================================
-  // CLEANUP
-  // ==========================================
 
   useEffect(() => {
     return () => {
@@ -194,21 +149,13 @@ function Camera({ disabled, onPhotoTaken }) {
     };
   }, []);
 
-  // ==========================================
-  // UI
-  // ==========================================
-
   return (
     <div className="camera-wrapper">
 
-      {/* ======================================
-          LIVE CAMERA
-      ====================================== */}
+      {/* LIVE CAMERA */}
 
       {cameraOn && (
         <div className="camera-box">
-
-          {/* Camera video */}
 
           <video
             ref={videoRef}
@@ -218,11 +165,7 @@ function Camera({ disabled, onPhotoTaken }) {
             className="camera-media"
           />
 
-          {/* Dark overlay */}
-
           <div className="camera-overlay"></div>
-
-          {/* Face guide */}
 
           <div className="face-frame">
             <span className="corner top-left"></span>
@@ -231,11 +174,7 @@ function Camera({ disabled, onPhotoTaken }) {
             <span className="corner bottom-right"></span>
           </div>
 
-          {/* Bottom gradient */}
-
           <div className="camera-bottom-gradient"></div>
-
-          {/* Take photo */}
 
           <button
             type="button"
@@ -243,21 +182,16 @@ function Camera({ disabled, onPhotoTaken }) {
             onClick={takePhoto}
           >
             <span className="capture-icon"></span>
-
             Take Photo
           </button>
 
         </div>
       )}
 
-      {/* ======================================
-          PHOTO PREVIEW
-      ====================================== */}
+      {/* PHOTO PREVIEW */}
 
       {photo && !cameraOn && (
         <div className="camera-box">
-
-          {/* Captured image */}
 
           <img
             src={photo}
@@ -265,11 +199,7 @@ function Camera({ disabled, onPhotoTaken }) {
             className="camera-media"
           />
 
-          {/* Preview overlay */}
-
           <div className="preview-overlay"></div>
-
-          {/* Buttons */}
 
           <div className="photo-actions">
 
@@ -294,9 +224,7 @@ function Camera({ disabled, onPhotoTaken }) {
         </div>
       )}
 
-      {/* ======================================
-          ERROR
-      ====================================== */}
+      {/* ERROR */}
 
       {error && (
         <div className="error-box">
@@ -321,9 +249,7 @@ function Camera({ disabled, onPhotoTaken }) {
         </div>
       )}
 
-      {/* ======================================
-          INITIAL BUTTON
-      ====================================== */}
+      {/* INITIAL BUTTON */}
 
       {!cameraOn &&
         !photo &&
@@ -338,9 +264,7 @@ function Camera({ disabled, onPhotoTaken }) {
           </button>
         )}
 
-      {/* ======================================
-          LOADING
-      ====================================== */}
+      {/* LOADING */}
 
       {cameraLoading && (
         <button
@@ -351,8 +275,6 @@ function Camera({ disabled, onPhotoTaken }) {
           Opening Camera...
         </button>
       )}
-
-      {/* Hidden canvas */}
 
       <canvas
         ref={canvasRef}

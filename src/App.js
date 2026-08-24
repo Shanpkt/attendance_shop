@@ -9,22 +9,46 @@ function App() {
   const [location, setLocation] = useState(null);
   const [photo, setPhoto] = useState(null);
 
-  // GPS completed
+  const [showMobileForm, setShowMobileForm] =
+    useState(false);
+
+  const [mobileNumber, setMobileNumber] =
+    useState("");
+
   const handleLocationReady = (locationData) => {
-    console.log("Location received in App:", locationData);
+    console.log(
+      "Location received in App:",
+      locationData
+    );
 
     setLocation(locationData);
   };
 
-  // Photo completed
   const handlePhotoTaken = (image) => {
-    console.log("Photo received in App:", image);
+    console.log(
+      "Photo received in App:",
+      image
+    );
 
     setPhoto(image);
+
+    // Photo submitted from Camera
+    if (image) {
+      setShowMobileForm(true);
+    }
   };
 
-  // Submit attendance
   const submitAttendance = () => {
+    if (!mobileNumber) {
+      alert("Please enter mobile number.");
+      return;
+    }
+
+    if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
+      alert("Please enter a valid 10 digit mobile number.");
+      return;
+    }
+
     if (!location) {
       alert("Location is not ready.");
       return;
@@ -35,102 +59,154 @@ function App() {
       return;
     }
 
+    const now = new Date();
+
     const attendanceData = {
+      mobileNumber: mobileNumber,
+
+      selfie: photo,
+
       latitude: location.latitude,
       longitude: location.longitude,
       accuracy: location.accuracy,
-      selfie: photo,
-      timestamp: new Date().toISOString(),
+
+      timestamp: now.toISOString(),
+
+      date: now.toLocaleDateString("en-IN"),
+
+      time: now.toLocaleTimeString("en-IN"),
     };
 
-    console.log("FINAL ATTENDANCE:", attendanceData);
+    console.log(
+      "========== FINAL ATTENDANCE JSON =========="
+    );
 
-    alert("Attendance submitted!");
+    console.log(
+      JSON.stringify(
+        attendanceData,
+        null,
+        2
+      )
+    );
+
+    console.log(
+      "==========================================="
+    );
+
+    alert("Attendance submitted successfully!");
+
+    setShowMobileForm(false);
   };
 
   return (
     <div className="home">
+
       <div className="attendance-card">
 
-        {/* Header */}
+        {/* HEADER */}
+
         <header className="header">
           <div>
-
-            <h1 className="attendace_text">Attendance</h1>
-
-           
+            <h1 className="attendace_text">
+              Attendance
+            </h1>
           </div>
-        </header> 
+        </header>
 
-        {/* =======================
-            GPS SECTION
-        ======================= */}
-<div className="main_section">
-  <div className="center_box">
-        {!location && (
-          <section className="section">
+        {/* GPS */}
 
-            <div className="section-title">
+        <div className="main_section">
 
-              <div className="icon gps-icon">
-                📍
-              </div>
+          <div className="center_box">
 
-              <div>
-                <h2>Location</h2>
+            {!location && (
+              <section className="section">
+
+                <div className="section-title">
+
+                  <div className="icon gps-icon">
+                    📍
+                  </div>
+
+                  <div>
+                    <h2>Location</h2>
+
+                    <p>
+                      Verify your location
+                    </p>
+                  </div>
+
+                </div>
+
+                <GPSLocation
+                  onLocationReady={
+                    handleLocationReady
+                  }
+                />
+
+              </section>
+            )}
+
+            {/* CAMERA */}
+
+            {location && (
+              <section className="section">
+
+                <Camera
+                  disabled={!location}
+                  onPhotoTaken={
+                    handlePhotoTaken
+                  }
+                />
+
+              </section>
+            )}
+
+            {/* MOBILE NUMBER */}
+
+            {showMobileForm && photo && (
+              <div className="mobile-number-box">
+
+                <h3>
+                  Enter Mobile Number
+                </h3>
 
                 <p>
-                  Verify your location
+                  Enter your registered mobile
+                  number to submit attendance.
                 </p>
+
+                <input
+                  type="tel"
+                  value={mobileNumber}
+                  onChange={(e) =>
+                    setMobileNumber(
+                      e.target.value.replace(
+                        /\D/g,
+                        ""
+                      )
+                    )
+                  }
+                  placeholder="Enter 10 digit mobile number"
+                  maxLength={10}
+                />
+
+                <button
+                  type="button"
+                  className="mark-attendance-button"
+                  onClick={submitAttendance}
+                >
+                  Submit Attendance
+                </button>
+
               </div>
+            )}
 
-            </div>
+          </div>
 
-            <GPSLocation
-              onLocationReady={handleLocationReady}
-            />
-
-          </section>
-        )}
-
-        {/* =======================
-            CAMERA SECTION
-        ======================= */}
-
-        {location && (
-          <section className="section">
-
-            <div className="section-title">
-
-             
-
-            
-
-            </div>
-
-            <Camera
-              disabled={!location}
-              onPhotoTaken={handlePhotoTaken}
-            />
-
-          </section>
-        )}
         </div>
-</div>
-        {/* =======================
-            SUBMIT
-        ======================= */}
 
-        {location && photo && (
-         <button
-  className="mark-attendance-button"
-  onClick={submitAttendance}
->
-  Mark Attendance
-</button>
-        )}
-
-        {/* Footer */}
+        {/* FOOTER */}
 
         <footer>
           <p>
@@ -140,6 +216,7 @@ function App() {
         </footer>
 
       </div>
+
     </div>
   );
 }
