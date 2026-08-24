@@ -122,9 +122,9 @@ function App() {
         ======================= */}
 
         {location && photo && (
-          <button
-  type="button"
+         <button
   className="mark-attendance-button"
+  onClick={submitAttendance}
 >
   Mark Attendance
 </button>

@@ -1,22 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 function GPSLocation({ onLocationReady }) {
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    getLocation();
+  // Store retry timer
+  const retryTimerRef = useRef(null);
 
-    // Cleanup
-    return () => {
-      // Nothing to clean here
-    };
-  }, []);
+  // ==========================================
+  // GET LOCATION
+  // ==========================================
 
-  const getLocation = () => {
+  const getLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported by this browser.");
+      setError(
+        "Geolocation is not supported by this browser."
+      );
+
       setLoading(false);
       return;
     }
@@ -40,7 +46,10 @@ function GPSLocation({ onLocationReady }) {
           "meters"
         );
 
-        // Continue until accuracy <= 150m
+        // ======================================
+        // ACCURACY GOOD
+        // ======================================
+
         if (accuracy <= 150) {
           const locationData = {
             latitude,
@@ -51,39 +60,68 @@ function GPSLocation({ onLocationReady }) {
           setLocation(locationData);
           setLoading(false);
 
+          console.log(
+            "Location verified:",
+            locationData
+          );
+
           // Send location to App
           if (onLocationReady) {
             onLocationReady(locationData);
           }
-        } else {
-          console.log(
-            `Accuracy ${Math.round(
-              accuracy
-            )}m. Trying again...`
-          );
 
-          setTimeout(() => {
-            getLocation();
-          }, 2000);
+          return;
         }
+
+        // ======================================
+        // ACCURACY NOT GOOD ENOUGH
+        // ======================================
+
+        console.log(
+          `Accuracy ${Math.round(
+            accuracy
+          )}m. Trying again...`
+        );
+
+        retryTimerRef.current = setTimeout(() => {
+          getLocation();
+        }, 2000);
       },
 
-      (error) => {
-        console.error("Location error:", error);
+      // ========================================
+      // GPS ERROR
+      // ========================================
 
-        if (error.code === 1) {
+      (gpsError) => {
+        console.error(
+          "Location error:",
+          gpsError
+        );
+
+        // Permission denied
+        if (gpsError.code === 1) {
           setError(
             "Location permission denied. Please allow location access."
           );
-          setLoading(false);
-        } else {
-          console.log("Temporary GPS error. Retrying...");
 
-          setTimeout(() => {
-            getLocation();
-          }, 2000);
+          setLoading(false);
+
+          return;
         }
+
+        // Other temporary errors
+        console.log(
+          "Temporary GPS error. Retrying..."
+        );
+
+        retryTimerRef.current = setTimeout(() => {
+          getLocation();
+        }, 2000);
       },
+
+      // ========================================
+      // GPS OPTIONS
+      // ========================================
 
       {
         enableHighAccuracy: true,
@@ -91,12 +129,39 @@ function GPSLocation({ onLocationReady }) {
         maximumAge: 0,
       }
     );
-  };
+  }, [onLocationReady]);
+
+  // ==========================================
+  // START GPS WHEN COMPONENT LOADS
+  // ==========================================
+
+  useEffect(() => {
+    getLocation();
+
+    // Cleanup retry timer
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(
+          retryTimerRef.current
+        );
+      }
+    };
+  }, [getLocation]);
+
+  // ==========================================
+  // UI
+  // ==========================================
 
   return (
     <div>
+
+      {/* ======================================
+          LOADING
+      ====================================== */}
+
       {loading && (
         <div className="loading-box">
+
           <div className="spinner"></div>
 
           <div>
@@ -105,15 +170,21 @@ function GPSLocation({ onLocationReady }) {
             </strong>
 
             <p>
-              Please wait while we get an accurate
-              location.
+              Please wait while we get an
+              accurate location.
             </p>
           </div>
+
         </div>
       )}
 
-      {location && (
+      {/* ======================================
+          SUCCESS
+      ====================================== */}
+
+      {location && !loading && (
         <div className="success-box">
+
           <div className="success-icon">
             ✓
           </div>
@@ -125,27 +196,40 @@ function GPSLocation({ onLocationReady }) {
 
             <p>
               Accuracy:{" "}
-              {Math.round(location.accuracy)}
-              {" "}meters
+              {Math.round(
+                location.accuracy
+              )}{" "}
+              meters
             </p>
           </div>
+
         </div>
       )}
 
+      {/* ======================================
+          ERROR
+      ====================================== */}
+
       {error && (
         <div className="error-box">
-          <strong>Location unavailable</strong>
+
+          <strong>
+            Location unavailable
+          </strong>
 
           <p>{error}</p>
 
           <button
+            type="button"
             className="secondary-button"
             onClick={getLocation}
           >
             Try Again
           </button>
+
         </div>
       )}
+
     </div>
   );
 }
