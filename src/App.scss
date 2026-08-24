@@ -1,0 +1,588 @@
+/* ==========================================
+   CAMERA WRAPPER
+========================================== */
+
+.camera-wrapper {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+}
+
+
+/* ==========================================
+   SAME CONTAINER FOR:
+
+   1. LIVE CAMERA
+   2. PHOTO PREVIEW
+
+   This guarantees exactly the same
+   width + height.
+========================================== */
+
+.camera-box {
+  position: relative;
+
+  width: 100%;
+  max-width: 500px;
+
+  /*
+    Responsive portrait window
+
+    width 400px  -> height 500px
+    width 320px  -> height 400px
+    width 280px  -> height 350px
+  */
+
+  aspect-ratio: 4 / 5;
+
+  overflow: hidden;
+
+  background: #000;
+
+  border-radius: 20px;
+
+  margin: 0 auto;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+
+/* ==========================================
+   VIDEO + IMAGE
+
+   EXACT SAME SIZE
+========================================== */
+
+.camera-media {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  display: block;
+}
+
+
+/* ==========================================
+   CAMERA DARK OVERLAY
+========================================== */
+
+.camera-overlay {
+  position: absolute;
+
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.08);
+
+  pointer-events: none;
+}
+
+
+/* ==========================================
+   FACE FRAME
+========================================== */
+
+.face-frame {
+  position: absolute;
+
+  width: 58%;
+  height: 62%;
+
+  left: 50%;
+  top: 45%;
+
+  transform: translate(-50%, -50%);
+
+  border: 2px solid rgba(255, 255, 255, 0.8);
+
+  border-radius: 50%;
+
+  box-sizing: border-box;
+
+  pointer-events: none;
+}
+
+
+/* ==========================================
+   FACE FRAME CORNERS
+========================================== */
+
+.corner {
+  position: absolute;
+
+  width: 25px;
+  height: 25px;
+
+  border-color: white;
+
+  border-style: solid;
+}
+
+
+/* Top left */
+
+.corner.top-left {
+  top: -2px;
+  left: -2px;
+
+  border-width: 4px 0 0 4px;
+
+  border-radius: 10px 0 0 0;
+}
+
+
+/* Top right */
+
+.corner.top-right {
+  top: -2px;
+  right: -2px;
+
+  border-width: 4px 4px 0 0;
+
+  border-radius: 0 10px 0 0;
+}
+
+
+/* Bottom left */
+
+.corner.bottom-left {
+  bottom: -2px;
+  left: -2px;
+
+  border-width: 0 0 4px 4px;
+
+  border-radius: 0 0 0 10px;
+}
+
+
+/* Bottom right */
+
+.corner.bottom-right {
+  bottom: -2px;
+  right: -2px;
+
+  border-width: 0 4px 4px 0;
+
+  border-radius: 0 0 10px 0;
+}
+
+
+/* ==========================================
+   BOTTOM GRADIENT
+========================================== */
+
+.camera-bottom-gradient {
+  position: absolute;
+
+  left: 0;
+  bottom: 0;
+
+  width: 100%;
+  height: 35%;
+
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.7),
+    transparent
+  );
+
+  pointer-events: none;
+}
+
+
+/* ==========================================
+   TAKE PHOTO BUTTON
+========================================== */
+
+.capture-button {
+  position: absolute;
+
+  z-index: 10;
+
+  left: 50%;
+  bottom: 20px;
+
+  transform: translateX(-50%);
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  padding: 12px 22px;
+
+  border: none;
+
+  border-radius: 30px;
+
+  background: white;
+
+  color: #222;
+
+  font-size: 15px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+
+  transition: 0.2s ease;
+}
+
+.capture-button:hover {
+  transform: translateX(-50%) scale(1.03);
+}
+
+.capture-button:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+
+/* ==========================================
+   CAMERA CIRCLE ICON
+========================================== */
+
+.capture-icon {
+  width: 18px;
+  height: 18px;
+
+  border: 2px solid #222;
+
+  border-radius: 50%;
+
+  display: inline-block;
+
+  position: relative;
+}
+
+.capture-icon::after {
+  content: "";
+
+  position: absolute;
+
+  width: 6px;
+  height: 6px;
+
+  background: #222;
+
+  border-radius: 50%;
+
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+}
+
+
+/* ==========================================
+   PREVIEW OVERLAY
+========================================== */
+
+.preview-overlay {
+  position: absolute;
+
+  inset: 0;
+
+  pointer-events: none;
+
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.7),
+    transparent 30%
+  );
+}
+
+
+/* ==========================================
+   PREVIEW BUTTONS
+========================================== */
+
+.photo-actions {
+  position: absolute;
+
+  z-index: 10;
+
+  left: 0;
+  bottom: 20px;
+
+  width: 100%;
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+
+/* ==========================================
+   RETAKE
+========================================== */
+
+.retake-button {
+  padding: 11px 22px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  background: white;
+
+  color: #222;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+}
+
+
+/* ==========================================
+   SUBMIT
+========================================== */
+
+.submit-button {
+  padding: 11px 25px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  background: #238aff;
+
+  color: white;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+}
+
+.submit-button:hover {
+  background: #1478e6;
+}
+
+
+/* ==========================================
+   INITIAL CLICK PHOTO BUTTON
+========================================== */
+
+.camera_primary-button {
+  padding: 12px 25px;
+
+  border: none;
+
+  border-radius: 8px;
+
+  background: #238aff;
+
+  color: white;
+
+  font-size: 16px;
+
+  cursor: pointer;
+}
+
+.camera_primary-button:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+
+/* ==========================================
+   LOADING
+========================================== */
+
+.primary-button {
+  padding: 12px 25px;
+
+  border: none;
+
+  border-radius: 8px;
+
+  background: #999;
+
+  color: white;
+
+  font-size: 16px;
+}
+
+
+/* ==========================================
+   ERROR
+========================================== */
+
+.error-box {
+  width: 100%;
+
+  max-width: 500px;
+
+  margin-top: 15px;
+
+  padding: 15px;
+
+  border-radius: 10px;
+
+  background: #ffecec;
+
+  color: #b00020;
+
+  text-align: center;
+
+  box-sizing: border-box;
+}
+
+.error-box strong {
+  font-size: 15px;
+}
+
+.error-box p {
+  margin: 8px 0 15px;
+
+  font-size: 14px;
+}
+
+
+/* ==========================================
+   TRY AGAIN
+========================================== */
+
+.try-again-button {
+  padding: 9px 18px;
+
+  border: none;
+
+  border-radius: 7px;
+
+  background: #238aff;
+
+  color: white;
+
+  cursor: pointer;
+}
+
+
+/* ==========================================
+   TABLET
+========================================== */
+
+@media (max-width: 768px) {
+
+  .camera-box {
+    width: 100%;
+
+    max-width: 500px;
+
+    aspect-ratio: 4 / 5;
+  }
+
+}
+
+
+/* ==========================================
+   MOBILE
+========================================== */
+
+@media (max-width: 480px) {
+
+  .camera-box {
+    width: 100%;
+
+    aspect-ratio: 4 / 5;
+
+    border-radius: 15px;
+  }
+
+  .face-frame {
+    width: 58%;
+    height: 62%;
+  }
+
+  .capture-button {
+    bottom: 15px;
+
+    padding: 10px 18px;
+
+    font-size: 14px;
+  }
+
+  .photo-actions {
+    bottom: 15px;
+
+    gap: 8px;
+  }
+
+  .retake-button,
+  .submit-button {
+    padding: 10px 18px;
+
+    font-size: 13px;
+  }
+}
+
+
+/* ==========================================
+   MARK ATTENDANCE BUTTON
+========================================== */
+
+.mark-attendance-button {
+  display: block;
+
+  margin: 20px auto 0;
+
+  padding: 12px 30px;
+
+  border: none;
+  border-radius: 8px;
+
+  background-color: #e53935;
+
+  color: white;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  text-align: center;
+
+  transition: all 0.2s ease;
+}
+
+.mark-attendance-button:hover {
+  background-color: #c62828;
+  transform: translateY(-1px);
+}
+
+.mark-attendance-button:active {
+  transform: translateY(0);
+}
+
+.mark-attendance-button:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
