@@ -1,549 +1,704 @@
-import React, { useState } from "react";
-
-import GPSLocation from "./gps";
-import Camera from "./camera";
-
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
-import Box from "@mui/material/Box";
-
-import axios from "axios";
-
+import React, { useEffect, useRef, useState } from "react";
+import GPSLocation from "./components/GPSLocation";
+import Camera from "./components/Camera";
 import "./App.scss";
+
+const API_URL = "https://attendance-backend-hs75.onrender.com/api/attendance";
 
 function App() {
   const [location, setLocation] = useState(null);
   const [photo, setPhoto] = useState(null);
 
-  const [openMobileDialog, setOpenMobileDialog] =
-    useState(false);
+  const [showMobileDialog, setShowMobileDialog] = useState(false);
+  const [mobileNumber, setMobileNumber] = useState("");
 
-  const [mobileNumber, setMobileNumber] =
-    useState("");
+  const [attendanceStatus, setAttendanceStatus] = useState(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
 
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [responseStatus, setResponseStatus] =
-    useState(null);
+  const [responseDialog, setResponseDialog] = useState({
+    show: false,
+    success: false,
+    title: "",
+    message: "",
+    action: "",
+  });
 
-  // Used to reset Camera component
-  const [cameraResetKey, setCameraResetKey] =
-    useState(0);
+  const mobileInputRef = useRef(null);
 
-  // ==========================================
-  // GPS LOCATION RECEIVED
-  // ==========================================
+  // --------------------------------------------------
+  // CURRENT DATE
+  // --------------------------------------------------
+
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString("en-IN");
+  };
+
+  // --------------------------------------------------
+  // LOCATION READY
+  // --------------------------------------------------
 
   const handleLocationReady = (locationData) => {
-    console.log(
-      "Location received in App:",
-      locationData
-    );
-
+    console.log("Location received:", locationData);
     setLocation(locationData);
   };
 
-  // ==========================================
-  // PHOTO RECEIVED
-  // ==========================================
+  // --------------------------------------------------
+  // CAMERA PHOTO
+  // --------------------------------------------------
 
   const handlePhotoTaken = (image) => {
-    console.log(
-      "Photo received in App:",
-      image
-    );
+    console.log("Photo captured");
 
     setPhoto(image);
+    setShowMobileDialog(true);
 
-    if (image) {
-      setResponseStatus(null);
-      setOpenMobileDialog(true);
-    }
+    setTimeout(() => {
+      mobileInputRef.current?.focus();
+    }, 200);
   };
 
-  // ==========================================
-  // RESET AFTER SUCCESS
-  // ==========================================
+  // --------------------------------------------------
+  // CHECK ATTENDANCE STATUS
+  // --------------------------------------------------
 
-  const resetAttendance = () => {
-    // Close dialog
-    setOpenMobileDialog(false);
-
-    // Clear photo
-    setPhoto(null);
-
-    // Clear mobile number
-    setMobileNumber("");
-
-    // Clear backend response
-    setResponseStatus(null);
-
-    // Reset Camera component
-    setCameraResetKey(
-      (previousKey) => previousKey + 1
-    );
-  };
-
-  // ==========================================
-  // SUBMIT ATTENDANCE
-  // ==========================================
-
-  const submitAttendance = async () => {
-
-    if (!mobileNumber) {
-      setResponseStatus({
-        type: "error",
-        message: "Please enter mobile number.",
-      });
-
+  const checkAttendanceStatus = async (number) => {
+    if (!/^\d{10}$/.test(number)) {
+      setAttendanceStatus(null);
       return;
     }
 
-    if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
-      setResponseStatus({
-        type: "error",
-        message:
-          "Please enter a valid 10 digit mobile number.",
-      });
+    try {
+      setCheckingStatus(true);
 
+      const date = getCurrentDate();
+
+      const response = await fetch(
+        `${API_URL}/status/${number}?date=${encodeURIComponent(date)}`
+      );
+
+      const data = await response.json();
+
+      console.log("Attendance status:", data);
+
+      if (response.ok) {
+        setAttendanceStatus(data);
+      } else {
+        setAttendanceStatus(null);
+      }
+    } catch (error) {
+      console.error("Status check error:", error);
+      setAttendanceStatus(null);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // MOBILE NUMBER CHANGE
+  // --------------------------------------------------
+
+  const handleMobileChange = (e) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+
+    setMobileNumber(value);
+
+    if (value.length === 10) {
+      checkAttendanceStatus(value);
+    } else {
+      setAttendanceStatus(null);
+    }
+  };
+
+  // --------------------------------------------------
+  // DETERMINE BUTTON TEXT
+  // --------------------------------------------------
+
+  const getActionText = () => {
+    if (checkingStatus) {
+      return "Checking...";
+    }
+
+    if (!attendanceStatus || attendanceStatus.exists === false) {
+      return "Punch In";
+    }
+
+    if (attendanceStatus.status === "Punched In") {
+      return "Punch Out";
+    }
+
+    if (attendanceStatus.status === "Punched Out") {
+      return "Completed";
+    }
+
+    return "Punch In";
+  };
+
+  // --------------------------------------------------
+  // ACTION DESCRIPTION
+  // --------------------------------------------------
+
+  const getActionDescription = () => {
+    if (checkingStatus) {
+      return "Checking today's attendance...";
+    }
+
+    if (!attendanceStatus || attendanceStatus.exists === false) {
+      return "You have not punched in today.";
+    }
+
+    if (attendanceStatus.status === "Punched In") {
+      return "You are currently punched in. Submit again to punch out.";
+    }
+
+    if (attendanceStatus.status === "Punched Out") {
+      return "Your attendance for today is already completed.";
+    }
+
+    return "";
+  };
+
+  // --------------------------------------------------
+  // SUBMIT ATTENDANCE
+  // --------------------------------------------------
+
+  const submitAttendance = async () => {
+    if (!mobileNumber) {
+      showError("Please enter your mobile number.");
+      return;
+    }
+
+    if (!/^\d{10}$/.test(mobileNumber)) {
+      showError("Please enter a valid 10-digit mobile number.");
       return;
     }
 
     if (!location) {
-      setResponseStatus({
-        type: "error",
-        message: "Location is not ready.",
-      });
-
+      showError("Location is not available. Please try again.");
       return;
     }
 
     if (!photo) {
-      setResponseStatus({
-        type: "error",
-        message: "Please take your selfie.",
-      });
-
+      showError("Please capture your selfie.");
       return;
     }
 
-    const now = new Date();
-
-    const attendanceData = {
-      mobileNumber: mobileNumber,
-
-      // selfie: photo,
-
-      latitude: location.latitude,
-      longitude: location.longitude,
-      accuracy: location.accuracy,
-
-      date: now.toLocaleDateString("en-IN"),
-      time: now.toLocaleTimeString("en-IN"),
-    };
-
-    console.log(
-      "========== FINAL ATTENDANCE =========="
-    );
-
-    console.log(
-      JSON.stringify(
-        attendanceData,
-        null,
-        2
-      )
-    );
-
-    console.log(
-      "======================================="
-    );
-
-    setSubmitting(true);
-    setResponseStatus(null);
-
     try {
+      setSubmitting(true);
 
-      const response = await axios.post(
-        "https://attendance-backend-hs75.onrender.com/api/attendance",
-        attendanceData
-      );
+      const date = getCurrentDate();
 
-      console.log(
-        "Backend response:",
-        response.data
-      );
+      const attendanceData = {
+        mobileNumber,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        date,
+      };
 
-      setResponseStatus({
-        type: "success",
-        message:
-          response.data.message ||
-          "Attendance submitted successfully.",
-        data:
-          response.data.data ||
-          attendanceData,
+      console.log("Sending attendance:", attendanceData);
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(attendanceData),
       });
 
-      setMobileNumber("");
+      const data = await response.json();
 
-    } catch (error) {
+      console.log("Attendance response:", data);
 
-      console.error(
-        "Attendance submission error:",
-        error
-      );
-
-      if (error.response) {
-
-        setResponseStatus({
-          type: "error",
-          message:
-            error.response.data?.message ||
-            "Server returned an error.",
-          data:
-            error.response.data,
-        });
-
-      } else {
-
-        setResponseStatus({
-          type: "error",
-          message:
-            "Unable to connect to the server.",
-        });
-
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to submit attendance."
+        );
       }
 
+      // ----------------------------------------------
+      // SUCCESS
+      // ----------------------------------------------
+
+      const action = data.action || data.data?.status || "Attendance";
+
+      setShowMobileDialog(false);
+
+      setResponseDialog({
+        show: true,
+        success: true,
+        title:
+          action === "Punched In"
+            ? "Punch In Successful"
+            : "Punch Out Successful",
+        message:
+          action === "Punched In"
+            ? "Your attendance has been successfully punched in."
+            : "Your attendance has been successfully punched out.",
+        action,
+      });
+
+      // Reset
+      setMobileNumber("");
+      setAttendanceStatus(null);
+      setPhoto(null);
+    } catch (error) {
+      console.error("Attendance submission error:", error);
+
+      showError(error.message || "Something went wrong.");
     } finally {
-
       setSubmitting(false);
-
     }
   };
 
-  // ==========================================
-  // UI
-  // ==========================================
+  // --------------------------------------------------
+  // ERROR DIALOG
+  // --------------------------------------------------
+
+  const showError = (message) => {
+    setResponseDialog({
+      show: true,
+      success: false,
+      title: "Attendance Failed",
+      message,
+      action: "",
+    });
+  };
+
+  // --------------------------------------------------
+  // CLOSE RESPONSE
+  // --------------------------------------------------
+
+  const closeResponseDialog = () => {
+    setResponseDialog({
+      show: false,
+      success: false,
+      title: "",
+      message: "",
+      action: "",
+    });
+  };
+
+  // --------------------------------------------------
+  // CLOSE MOBILE DIALOG
+  // --------------------------------------------------
+
+  const closeMobileDialog = () => {
+    if (submitting) return;
+
+    setShowMobileDialog(false);
+    setMobileNumber("");
+    setAttendanceStatus(null);
+    setPhoto(null);
+  };
+
+  // --------------------------------------------------
+  // RENDER
+  // --------------------------------------------------
 
   return (
-    <div className="home">
+    <div className="attendance-app">
 
-      <div className="attendance-card">
+      {/* ==================================================
+          HEADER
+      ================================================== */}
 
-        {/* HEADER */}
+      <header className="attendance-header">
+        <div className="header-content">
 
-        <header className="header">
+          <div className="logo-section">
+            <div className="logo-icon">
+              ✓
+            </div>
 
-          <div>
+            <div>
+              <h1>Employee Attendance</h1>
+              <p>Daily Attendance System</p>
+            </div>
+          </div>
 
-            <h1 className="attendace_text">
-              Attendance
-            </h1>
+          <div className="header-date">
+            <span>Today</span>
+            <strong>{getCurrentDate()}</strong>
+          </div>
+
+        </div>
+      </header>
+
+
+      {/* ==================================================
+          MAIN
+      ================================================== */}
+
+      <main className="attendance-main">
+
+        {/* --------------------------------------------------
+            STEP 1 - LOCATION
+        -------------------------------------------------- */}
+
+        <section className="attendance-card">
+
+          <div className="card-header">
+
+            <div className="step-number">
+              1
+            </div>
+
+            <div>
+              <h2>Verify Your Location</h2>
+              <p>
+                Your location must be verified before attendance.
+              </p>
+            </div>
 
           </div>
 
-        </header>
+          <div className="location-container">
 
-        {/* GPS */}
+            <GPSLocation
+              onLocationReady={handleLocationReady}
+            />
 
-        <div className="main_section">
+          </div>
 
-          <div className="center_box">
+        </section>
 
-            {!location && (
 
-              <section className="section">
+        {/* --------------------------------------------------
+            STEP 2 - CAMERA
+        -------------------------------------------------- */}
 
-                <div className="section-title">
+        {location && (
+          <section className="attendance-card">
 
-                  <div className="icon gps-icon">
-                    📍
-                  </div>
+            <div className="card-header">
 
-                  <div>
+              <div className="step-number">
+                2
+              </div>
 
-                    <h2>
-                      Location
-                    </h2>
+              <div>
+                <h2>Capture Selfie</h2>
+                <p>
+                  Take a clear selfie to verify your attendance.
+                </p>
+              </div>
 
-                    <p>
-                      Verify your location
-                    </p>
+            </div>
 
-                  </div>
+            <div className="camera-container">
+
+              <Camera
+                onPhotoTaken={handlePhotoTaken}
+              />
+
+            </div>
+
+          </section>
+        )}
+
+      </main>
+
+
+      {/* ==================================================
+          MOBILE NUMBER DIALOG
+      ================================================== */}
+
+      {showMobileDialog && (
+        <div className="dialog-overlay">
+
+          <div className="mobile-dialog">
+
+            {/* Header */}
+
+            <div className="dialog-header">
+
+              <div className="dialog-icon">
+                📱
+              </div>
+
+              <div>
+                <h2>Employee Verification</h2>
+
+                <p>
+                  Enter your registered mobile number
+                </p>
+              </div>
+
+              <button
+                className="close-button"
+                onClick={closeMobileDialog}
+                disabled={submitting}
+              >
+                ×
+              </button>
+
+            </div>
+
+
+            {/* Body */}
+
+            <div className="dialog-body">
+
+              <label htmlFor="mobileNumber">
+                Mobile Number
+              </label>
+
+              <div className="mobile-input-wrapper">
+
+                <span className="country-code">
+                  +91
+                </span>
+
+                <input
+                  ref={mobileInputRef}
+                  id="mobileNumber"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="Enter 10 digit mobile number"
+                  value={mobileNumber}
+                  onChange={handleMobileChange}
+                  disabled={submitting}
+                />
+
+              </div>
+
+
+              {/* STATUS */}
+
+              {mobileNumber.length === 10 && (
+                <div className="attendance-status-box">
+
+                  {checkingStatus ? (
+
+                    <div className="status-loading">
+                      <span className="spinner small"></span>
+                      Checking attendance...
+                    </div>
+
+                  ) : !attendanceStatus ||
+                    attendanceStatus.exists === false ? (
+
+                    <div className="status-new">
+                      <span className="status-icon">
+                        ✓
+                      </span>
+
+                      <div>
+                        <strong>Ready to Punch In</strong>
+                        <p>
+                          No attendance found for today.
+                        </p>
+                      </div>
+                    </div>
+
+                  ) : attendanceStatus.status === "Punched In" ? (
+
+                    <div className="status-punched-in">
+
+                      <span className="status-icon">
+                        🟢
+                      </span>
+
+                      <div>
+                        <strong>Already Punched In</strong>
+
+                        <p>
+                          Your next action will be Punch Out.
+                        </p>
+                      </div>
+
+                    </div>
+
+                  ) : (
+
+                    <div className="status-completed">
+
+                      <span className="status-icon">
+                        ✓
+                      </span>
+
+                      <div>
+                        <strong>Attendance Completed</strong>
+
+                        <p>
+                          You have already punched out today.
+                        </p>
+                      </div>
+
+                    </div>
+
+                  )}
 
                 </div>
+              )}
 
-                <GPSLocation
-                  onLocationReady={
-                    handleLocationReady
-                  }
-                />
 
-              </section>
+              {/* INFO */}
 
-            )}
+              <div className="attendance-info">
 
-            {/* CAMERA */}
+                <div className="info-row">
+                  <span>📍</span>
+                  <div>
+                    <strong>Location</strong>
+                    <small>
+                      {location
+                        ? "Verified"
+                        : "Not available"}
+                    </small>
+                  </div>
+                </div>
 
-            {location && (
 
-              <section className="section">
+                <div className="info-row">
+                  <span>📸</span>
 
-                <Camera
-                  key={cameraResetKey}
-                  disabled={!location}
-                  onPhotoTaken={
-                    handlePhotoTaken
-                  }
-                />
+                  <div>
+                    <strong>Selfie</strong>
 
-              </section>
+                    <small>
+                      {photo
+                        ? "Captured"
+                        : "Not captured"}
+                    </small>
+                  </div>
+                </div>
 
-            )}
+
+                <div className="info-row">
+                  <span>📅</span>
+
+                  <div>
+                    <strong>Date</strong>
+
+                    <small>
+                      {getCurrentDate()}
+                    </small>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* Footer */}
+
+            <div className="dialog-footer">
+
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={closeMobileDialog}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+
+
+              <button
+                type="button"
+                className={`submit-button ${
+                  attendanceStatus?.status === "Punched In"
+                    ? "punch-out"
+                    : ""
+                }`}
+                onClick={submitAttendance}
+                disabled={
+                  submitting ||
+                  checkingStatus ||
+                  mobileNumber.length !== 10 ||
+                  attendanceStatus?.status === "Punched Out"
+                }
+              >
+
+                {submitting ? (
+
+                  <>
+                    <span className="spinner"></span>
+                    Processing...
+                  </>
+
+                ) : (
+
+                  <>
+                    {getActionText()}
+                    <span>→</span>
+                  </>
+
+                )}
+
+              </button>
+
+            </div>
 
           </div>
 
         </div>
+      )}
 
-        {/* FOOTER */}
 
-        <footer>
+      {/* ==================================================
+          RESPONSE DIALOG
+      ================================================== */}
 
-          <p>
-            Your location and selfie are used
-            for attendance verification.
-          </p>
+      {responseDialog.show && (
+        <div className="dialog-overlay">
 
-        </footer>
+          <div className="response-dialog">
 
-      </div>
-
-      {/* =========================================
-          MATERIAL UI DIALOG
-      ========================================= */}
-
-      <Dialog
-        open={openMobileDialog}
-        onClose={() => {
-
-          if (!submitting) {
-            setOpenMobileDialog(false);
-          }
-
-        }}
-        fullWidth
-        maxWidth="xs"
-      >
-
-        <DialogTitle>
-
-          {responseStatus ? (
-
-            responseStatus.type ===
-            "success" ? (
-
-              <Typography
-                variant="h6"
-                sx={{
-                  color: "green",
-                  fontWeight: "bold",
-                }}
-              >
-                ✓ Attendance Successful
-              </Typography>
-
-            ) : (
-
-              <Typography
-                variant="h6"
-                sx={{
-                  color: "red",
-                  fontWeight: "bold",
-                }}
-              >
-                ✕ Submission Failed
-              </Typography>
-
-            )
-
-          ) : (
-
-            "Submit Attendance"
-
-          )}
-
-        </DialogTitle>
-
-        <DialogContent>
-
-          {/* MOBILE FORM */}
-
-          {!responseStatus && (
-
-            <>
-              <Typography
-                variant="body2"
-                sx={{ mb: 1 }}
-              >
-                Enter your mobile number to
-                complete attendance.
-              </Typography>
-
-              <TextField
-                autoFocus
-                fullWidth
-                label="Mobile Number"
-                placeholder="Enter 10 digit mobile number"
-                type="tel"
-                value={mobileNumber}
-                onChange={(e) => {
-
-                  const value =
-                    e.target.value.replace(
-                      /\D/g,
-                      ""
-                    );
-
-                  setMobileNumber(value);
-
-                }}
-                inputProps={{
-                  maxLength: 10,
-                }}
-                margin="normal"
-              />
-            </>
-
-          )}
-
-          {/* BACKEND RESPONSE */}
-
-          {responseStatus && (
-
-            <Box>
-
-              <Typography
-                variant="body1"
-                sx={{
-                  fontWeight: "bold",
-                  mb: 2,
-                  color:
-                    responseStatus.type ===
-                    "success"
-                      ? "green"
-                      : "red",
-                }}
-              >
-                {responseStatus.message}
-              </Typography>
-
-              {responseStatus.data && (
-
-                <Box
-                  sx={{
-                    backgroundColor:
-                      "#f5f5f5",
-                    padding: 2,
-                    borderRadius: 2,
-                  }}
-                >
-
-                  <Typography
-                    variant="subtitle2"
-                    sx={{ mb: 1 }}
-                  >
-                    Data Received
-                  </Typography>
-
-                  <pre
-                    style={{
-                      margin: 0,
-                      whiteSpace:
-                        "pre-wrap",
-                      wordBreak:
-                        "break-word",
-                      fontSize: "13px",
-                    }}
-                  >
-                    {JSON.stringify(
-                      responseStatus.data,
-                      null,
-                      2
-                    )}
-                  </pre>
-
-                </Box>
-
-              )}
-
-            </Box>
-
-          )}
-
-        </DialogContent>
-
-        {/* BUTTONS */}
-
-        <DialogActions>
-
-          {!responseStatus && (
-
-            <>
-              <Button
-                onClick={() =>
-                  setOpenMobileDialog(false)
-                }
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-
-              <Button
-                variant="contained"
-                onClick={submitAttendance}
-                disabled={submitting}
-              >
-                {submitting
-                  ? "Submitting..."
-                  : "Submit"}
-              </Button>
-            </>
-
-          )}
-
-          {/* SUCCESS / ERROR CLOSE */}
-
-          {responseStatus && (
-
-            <Button
-              variant="contained"
-              onClick={() => {
-
-                if (
-                  responseStatus.type ===
-                  "success"
-                ) {
-                  resetAttendance();
-                } else {
-                  setResponseStatus(null);
-                }
-
-              }}
+            <div
+              className={`response-icon ${
+                responseDialog.success
+                  ? "success"
+                  : "error"
+              }`}
             >
-              Close
-            </Button>
 
-          )}
+              {responseDialog.success ? "✓" : "!"}
 
-        </DialogActions>
+            </div>
 
-      </Dialog>
+
+            <h2>
+              {responseDialog.title}
+            </h2>
+
+
+            <p>
+              {responseDialog.message}
+            </p>
+
+
+            {responseDialog.action && (
+              <div className="action-result">
+
+                <span>
+                  Attendance Status
+                </span>
+
+                <strong>
+                  {responseDialog.action}
+                </strong>
+
+              </div>
+            )}
+
+
+            <button
+              className="response-button"
+              onClick={closeResponseDialog}
+            >
+              Done
+            </button>
+
+          </div>
+
+        </div>
+      )}
 
     </div>
   );
