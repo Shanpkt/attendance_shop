@@ -34,15 +34,13 @@ export const uploadAttendanceImage = async (
   base64Image,
   mobileNumber
 ) => {
-  if (!/^\d{10}$/.test(mobileNumber)) {
-    throw new Error(
-      "A valid mobile number is required before uploading the selfie."
-    );
-  }
-
   const blob = await dataUrlToBlob(base64Image);
 
-  const fileName = `${mobileNumber}/${Date.now()}.jpg`;
+  const folder = /^\d{10}$/.test(mobileNumber || "")
+    ? mobileNumber
+    : "pending";
+
+  const fileName = `${folder}/${Date.now()}.jpg`;
 
   const { data, error } = await supabase.storage
     .from(STORAGE_BUCKET)

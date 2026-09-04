@@ -26,6 +26,21 @@ function App() {
 
   const [photo, setPhoto] = useState(null);
 
+  const [selfieUrl, setSelfieUrl] = useState(null);
+
+  const [cameraResetKey, setCameraResetKey] =
+    useState(0);
+
+  // =========================================================
+  // PHOTO SUBMIT DIALOG
+  // =========================================================
+
+  const [showPhotoDialog, setShowPhotoDialog] =
+    useState(false);
+
+  const [uploadingPhoto, setUploadingPhoto] =
+    useState(false);
+
   // =========================================================
   // MOBILE NUMBER DIALOG
   // =========================================================
@@ -52,9 +67,6 @@ function App() {
 
   const [submitting, setSubmitting] =
     useState(false);
-
-  const [submitPhase, setSubmitPhase] =
-    useState("idle");
 
   // =========================================================
   // RESPONSE DIALOG
@@ -136,7 +148,47 @@ function App() {
       }
 
       setPhoto(image);
+      setSelfieUrl(null);
+      setShowPhotoDialog(true);
+    },
+    []
+  );
 
+  const resetCamera = () => {
+    setPhoto(null);
+    setSelfieUrl(null);
+    setCameraResetKey((key) => key + 1);
+  };
+
+  const closePhotoDialog = () => {
+    if (uploadingPhoto) {
+      return;
+    }
+
+    setShowPhotoDialog(false);
+    resetCamera();
+  };
+
+  const submitPhoto = async () => {
+    if (!photo) {
+      showError("Please capture your selfie.");
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+
+      const uploadedUrl =
+        await uploadAttendanceImage(photo);
+
+      if (!uploadedUrl) {
+        throw new Error(
+          "Selfie upload failed. Please try again."
+        );
+      }
+
+      setSelfieUrl(uploadedUrl);
+      setShowPhotoDialog(false);
       setShowMobileDialog(true);
 
       setTimeout(() => {
@@ -144,9 +196,18 @@ function App() {
           mobileInputRef.current.focus();
         }
       }, 200);
-    },
-    []
-  );
+    } catch (error) {
+      console.error("Selfie upload error:", error);
+
+      showError(
+        error.message ||
+          "Unable to submit photo. Please try again.",
+        "Photo Submit Failed"
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // =========================================================
   // CHECK ATTENDANCE STATUS
@@ -289,47 +350,14 @@ function App() {
   };
 
   // =========================================================
-  // ACTION DESCRIPTION
-  // =========================================================
-
-  const getActionDescription = () => {
-    if (checkingStatus) {
-      return "Checking today's attendance...";
-    }
-
-    if (
-      !attendanceStatus ||
-      attendanceStatus.exists === false
-    ) {
-      return "You have not punched in today.";
-    }
-
-    if (
-      attendanceStatus.status ===
-      "Punched In"
-    ) {
-      return "You are currently punched in. Submit again to punch out.";
-    }
-
-    if (
-      attendanceStatus.status ===
-      "Punched Out"
-    ) {
-      return "Your attendance for today is already completed.";
-    }
-
-    return "";
-  };
-
-  // =========================================================
   // ERROR DIALOG
   // =========================================================
 
-  const showError = (message) => {
+  const showError = (message, title = "Attendance Failed") => {
     setResponseDialog({
       show: true,
       success: false,
-      title: "Attendance Failed",
+      title,
       message: message,
       action: "",
     });
@@ -376,9 +404,9 @@ function App() {
     // VALIDATE PHOTO
     // -------------------------------------------------------
 
-    if (!photo) {
+    if (!photo || !selfieUrl) {
       showError(
-        "Please capture your selfie."
+        "Please capture and submit your selfie."
       );
 
       return;
@@ -404,42 +432,6 @@ function App() {
       setSubmitting(true);
 
       const date = getCurrentDate();
-
-      // =====================================================
-      // STEP 1
-      // UPLOAD IMAGE
-      // =====================================================
-
-      setSubmitPhase("uploading");
-
-      console.log(
-        "Uploading selfie..."
-      );
-
-      const selfieUrl =
-        await uploadAttendanceImage(
-          photo,
-          mobileNumber
-        );
-
-      if (!selfieUrl) {
-        throw new Error(
-          "Selfie upload failed. Attendance was not submitted."
-        );
-      }
-
-      console.log(
-        "Selfie uploaded successfully:"
-      );
-
-      console.log(
-        selfieUrl
-      );
-
-      // =====================================================
-      // STEP 2
-      // CREATE ATTENDANCE PAYLOAD
-      // =====================================================
 
       const attendanceData = {
         mobileNumber:
@@ -497,8 +489,6 @@ function App() {
       // STEP 3
       // POST ATTENDANCE
       // =====================================================
-
-      setSubmitPhase("saving");
 
       const response =
         await fetch(
@@ -649,6 +639,8 @@ function App() {
       );
 
       setPhoto(null);
+      setSelfieUrl(null);
+      setCameraResetKey((key) => key + 1);
     } catch (error) {
       console.error(
         "Attendance submission error:",
@@ -661,8 +653,6 @@ function App() {
       );
     } finally {
       setSubmitting(false);
-
-      setSubmitPhase("idle");
     }
   };
 
@@ -696,6 +686,8 @@ function App() {
     setAttendanceStatus(null);
 
     setPhoto(null);
+    setSelfieUrl(null);
+    setCameraResetKey((key) => key + 1);
   };
 
   // =========================================================
@@ -776,8 +768,9 @@ function App() {
                 </h2>
 
                 <p>
-                  Your location must be verified
-                  before attendance.
+                  You must be within 50 meters of
+                  the office location saved in
+                  admin settings.
                 </p>
 
               </div>
@@ -832,6 +825,13 @@ function App() {
                 onPhotoTaken={
                   handlePhotoTaken
                 }
+                resetKey={
+                  cameraResetKey
+                }
+                disabled={
+                  uploadingPhoto ||
+                  submitting
+                }
               />
 
             </div>
@@ -840,6 +840,100 @@ function App() {
         )}
 
       </main>
+
+      {/* ===================================================
+          PHOTO SUBMIT DIALOG
+      =================================================== */}
+
+      {showPhotoDialog && (
+        <div className="dialog-overlay">
+
+          <div className="photo-dialog">
+
+            <div className="dialog-header">
+
+              <div className="dialog-icon">
+                📸
+              </div>
+
+              <div>
+
+                <h2>
+                  Submit Photo
+                </h2>
+
+                <p>
+                  Review your selfie, then submit
+                  it to continue.
+                </p>
+
+              </div>
+
+              <button
+                className="close-button"
+                onClick={closePhotoDialog}
+                disabled={uploadingPhoto}
+              >
+                ×
+              </button>
+
+            </div>
+
+            <div className="dialog-body">
+
+              {photo && (
+                <img
+                  src={photo}
+                  alt="Captured selfie"
+                  className="photo-preview"
+                />
+              )}
+
+              <p className="photo-dialog-hint">
+                Make sure your face is clearly
+                visible. You can retake if needed.
+              </p>
+
+            </div>
+
+            <div className="dialog-footer">
+
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={closePhotoDialog}
+                disabled={uploadingPhoto}
+              >
+                Retake
+              </button>
+
+              <button
+                type="button"
+                className="submit-button"
+                onClick={submitPhoto}
+                disabled={uploadingPhoto || !photo}
+              >
+
+                {uploadingPhoto ? (
+                  <>
+                    <span className="spinner"></span>
+                    Submitting photo...
+                  </>
+                ) : (
+                  <>
+                    Submit Photo
+                    <span>→</span>
+                  </>
+                )}
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
       {/* ===================================================
           MOBILE NUMBER DIALOG
@@ -1057,9 +1151,11 @@ function App() {
                     </strong>
 
                     <small>
-                      {photo
-                        ? "Captured"
-                        : "Not captured"}
+                      {selfieUrl
+                        ? "Submitted"
+                        : photo
+                          ? "Captured"
+                          : "Not captured"}
                     </small>
 
                   </div>
@@ -1135,10 +1231,7 @@ function App() {
                   <>
                     <span className="spinner"></span>
 
-                    {submitPhase ===
-                    "uploading"
-                      ? "Uploading selfie..."
-                      : "Saving attendance..."}
+                    Saving attendance...
                   </>
 
                 ) : (

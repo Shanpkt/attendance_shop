@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./App.scss";
 
-function Camera({ disabled, onPhotoTaken }) {
+function Camera({ disabled, onPhotoTaken, resetKey = 0 }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -98,7 +98,31 @@ function Camera({ disabled, onPhotoTaken }) {
     setPhoto(image);
 
     stopCamera();
+
+    if (onPhotoTaken) {
+      onPhotoTaken(image);
+    }
   };
+
+  useEffect(() => {
+    if (!resetKey) {
+      return;
+    }
+
+    setPhoto(null);
+    setError("");
+
+    if (disabled) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      openCamera();
+    }, 100);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -114,27 +138,6 @@ function Camera({ disabled, onPhotoTaken }) {
     }
 
     setCameraOn(false);
-  };
-
-  const retakePhoto = () => {
-    setPhoto(null);
-
-    if (onPhotoTaken) {
-      onPhotoTaken(null);
-    }
-
-    setTimeout(() => {
-      openCamera();
-    }, 100);
-  };
-
-  // SEND PHOTO TO APP
-  const submitPhoto = () => {
-    if (!photo) return;
-
-    if (onPhotoTaken) {
-      onPhotoTaken(photo);
-    }
   };
 
   useEffect(() => {
@@ -202,23 +205,9 @@ function Camera({ disabled, onPhotoTaken }) {
           <div className="preview-overlay"></div>
 
           <div className="photo-actions">
-
-            <button
-              type="button"
-              className="retake-button"
-              onClick={retakePhoto}
-            >
-              ↻ Retake
-            </button>
-
-            <button
-              type="button"
-              className="submit-button"
-              onClick={submitPhoto}
-            >
-              ✓ Submit
-            </button>
-
+            <div className="photo-captured-hint">
+              Photo captured
+            </div>
           </div>
 
         </div>
