@@ -32,12 +32,6 @@ export const getDistanceInMeters = (
   );
 };
 
-export const getGeofenceRadius = (settings) => {
-  const accuracy = Number(settings?.accuracy);
-
-  if (Number.isFinite(accuracy) && accuracy > 0) {
-    return accuracy;
-  }
-
+export const getGeofenceRadius = () => {
   return DEFAULT_GEOFENCE_METERS;
 };

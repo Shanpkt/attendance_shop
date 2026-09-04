@@ -143,7 +143,7 @@ function GPSLocation({ onLocationReady }) {
         const office = {
           latitude,
           longitude,
-          radius: getGeofenceRadius(data),
+          radius: getGeofenceRadius(),
         };
 
         officeRef.current = office;
