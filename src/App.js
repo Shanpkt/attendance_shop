@@ -1,69 +1,160 @@
-import React, { useEffect, useRef, useState } from "react";
-import GPSLocation from "./components/GPSLocation";
-import Camera from "./components/Camera";
+import React, {
+  useCallback,
+  useRef,
+  useState,
+} from "react";
+
+import GPSLocation from "./gps.jsx";
+import Camera from "./camera";
+import { uploadAttendanceImage } from "./services/uploadImage";
+
 import "./App.scss";
 
-const API_URL = "https://attendance-backend-hs75.onrender.com/api/attendance";
+const API_URL =
+  "https://attendance-backend-hs75.onrender.com/api/attendance";
 
 function App() {
+  // =========================================================
+  // LOCATION
+  // =========================================================
+
   const [location, setLocation] = useState(null);
+
+  // =========================================================
+  // PHOTO
+  // =========================================================
+
   const [photo, setPhoto] = useState(null);
 
-  const [showMobileDialog, setShowMobileDialog] = useState(false);
-  const [mobileNumber, setMobileNumber] = useState("");
+  // =========================================================
+  // MOBILE NUMBER DIALOG
+  // =========================================================
 
-  const [attendanceStatus, setAttendanceStatus] = useState(null);
-  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [showMobileDialog, setShowMobileDialog] =
+    useState(false);
 
-  const [submitting, setSubmitting] = useState(false);
+  const [mobileNumber, setMobileNumber] =
+    useState("");
 
-  const [responseDialog, setResponseDialog] = useState({
-    show: false,
-    success: false,
-    title: "",
-    message: "",
-    action: "",
-  });
+  // =========================================================
+  // ATTENDANCE STATUS
+  // =========================================================
+
+  const [attendanceStatus, setAttendanceStatus] =
+    useState(null);
+
+  const [checkingStatus, setCheckingStatus] =
+    useState(false);
+
+  // =========================================================
+  // SUBMITTING
+  // =========================================================
+
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  const [submitPhase, setSubmitPhase] =
+    useState("idle");
+
+  // =========================================================
+  // RESPONSE DIALOG
+  // =========================================================
+
+  const [responseDialog, setResponseDialog] =
+    useState({
+      show: false,
+      success: false,
+      title: "",
+      message: "",
+      action: "",
+    });
+
+  // =========================================================
+  // MOBILE INPUT REF
+  // =========================================================
 
   const mobileInputRef = useRef(null);
 
-  // --------------------------------------------------
+  // =========================================================
   // CURRENT DATE
-  // --------------------------------------------------
+  // =========================================================
 
   const getCurrentDate = () => {
     return new Date().toLocaleDateString("en-IN");
   };
 
-  // --------------------------------------------------
+  // =========================================================
   // LOCATION READY
-  // --------------------------------------------------
+  // =========================================================
 
-  const handleLocationReady = (locationData) => {
-    console.log("Location received:", locationData);
-    setLocation(locationData);
-  };
+  const handleLocationReady = useCallback(
+    (locationData) => {
+      console.log(
+        "================================"
+      );
 
-  // --------------------------------------------------
-  // CAMERA PHOTO
-  // --------------------------------------------------
+      console.log(
+        "LOCATION RECEIVED IN APP"
+      );
 
-  const handlePhotoTaken = (image) => {
-    console.log("Photo captured");
+      console.log(
+        "Latitude:",
+        locationData?.latitude
+      );
 
-    setPhoto(image);
-    setShowMobileDialog(true);
+      console.log(
+        "Longitude:",
+        locationData?.longitude
+      );
 
-    setTimeout(() => {
-      mobileInputRef.current?.focus();
-    }, 200);
-  };
+      console.log(
+        "Accuracy:",
+        locationData?.accuracy
+      );
 
-  // --------------------------------------------------
+      console.log(
+        "================================"
+      );
+
+      setLocation(locationData);
+    },
+    []
+  );
+
+  // =========================================================
+  // PHOTO TAKEN
+  // =========================================================
+
+  const handlePhotoTaken = useCallback(
+    (image) => {
+      console.log(
+        "Photo received in App"
+      );
+
+      if (!image) {
+        return;
+      }
+
+      setPhoto(image);
+
+      setShowMobileDialog(true);
+
+      setTimeout(() => {
+        if (mobileInputRef.current) {
+          mobileInputRef.current.focus();
+        }
+      }, 200);
+    },
+    []
+  );
+
+  // =========================================================
   // CHECK ATTENDANCE STATUS
-  // --------------------------------------------------
+  // =========================================================
 
-  const checkAttendanceStatus = async (number) => {
+  const checkAttendanceStatus = async (
+    number
+  ) => {
     if (!/^\d{10}$/.test(number)) {
       setAttendanceStatus(null);
       return;
@@ -74,33 +165,86 @@ function App() {
 
       const date = getCurrentDate();
 
-      const response = await fetch(
-        `${API_URL}/status/${number}?date=${encodeURIComponent(date)}`
+      const statusUrl =
+        `${API_URL}/status/${number}?date=${encodeURIComponent(
+          date
+        )}`;
+
+      console.log(
+        "================================"
       );
 
-      const data = await response.json();
+      console.log(
+        "CHECKING ATTENDANCE STATUS"
+      );
 
-      console.log("Attendance status:", data);
+      console.log(
+        "Method: GET"
+      );
 
-      if (response.ok) {
-        setAttendanceStatus(data);
-      } else {
+      console.log(
+        "URL:",
+        statusUrl
+      );
+
+      console.log(
+        "Mobile:",
+        number
+      );
+
+      console.log(
+        "Date:",
+        date
+      );
+
+      console.log(
+        "================================"
+      );
+
+      const response =
+        await fetch(statusUrl);
+
+      const data =
+        await response.json();
+
+      console.log(
+        "STATUS RESPONSE:",
+        data
+      );
+
+      if (!response.ok) {
+        console.error(
+          "Status API failed:",
+          data
+        );
+
         setAttendanceStatus(null);
+
+        return;
       }
+
+      setAttendanceStatus(data);
     } catch (error) {
-      console.error("Status check error:", error);
+      console.error(
+        "Status check error:",
+        error
+      );
+
       setAttendanceStatus(null);
     } finally {
       setCheckingStatus(false);
     }
   };
 
-  // --------------------------------------------------
+  // =========================================================
   // MOBILE NUMBER CHANGE
-  // --------------------------------------------------
+  // =========================================================
 
   const handleMobileChange = (e) => {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+    const value =
+      e.target.value
+        .replace(/\D/g, "")
+        .slice(0, 10);
 
     setMobileNumber(value);
 
@@ -111,76 +255,148 @@ function App() {
     }
   };
 
-  // --------------------------------------------------
-  // DETERMINE BUTTON TEXT
-  // --------------------------------------------------
+  // =========================================================
+  // ACTION TEXT
+  // =========================================================
 
   const getActionText = () => {
     if (checkingStatus) {
       return "Checking...";
     }
 
-    if (!attendanceStatus || attendanceStatus.exists === false) {
+    if (
+      !attendanceStatus ||
+      attendanceStatus.exists === false
+    ) {
       return "Punch In";
     }
 
-    if (attendanceStatus.status === "Punched In") {
+    if (
+      attendanceStatus.status ===
+      "Punched In"
+    ) {
       return "Punch Out";
     }
 
-    if (attendanceStatus.status === "Punched Out") {
+    if (
+      attendanceStatus.status ===
+      "Punched Out"
+    ) {
       return "Completed";
     }
 
     return "Punch In";
   };
 
-  // --------------------------------------------------
+  // =========================================================
   // ACTION DESCRIPTION
-  // --------------------------------------------------
+  // =========================================================
 
   const getActionDescription = () => {
     if (checkingStatus) {
       return "Checking today's attendance...";
     }
 
-    if (!attendanceStatus || attendanceStatus.exists === false) {
+    if (
+      !attendanceStatus ||
+      attendanceStatus.exists === false
+    ) {
       return "You have not punched in today.";
     }
 
-    if (attendanceStatus.status === "Punched In") {
+    if (
+      attendanceStatus.status ===
+      "Punched In"
+    ) {
       return "You are currently punched in. Submit again to punch out.";
     }
 
-    if (attendanceStatus.status === "Punched Out") {
+    if (
+      attendanceStatus.status ===
+      "Punched Out"
+    ) {
       return "Your attendance for today is already completed.";
     }
 
     return "";
   };
 
-  // --------------------------------------------------
+  // =========================================================
+  // ERROR DIALOG
+  // =========================================================
+
+  const showError = (message) => {
+    setResponseDialog({
+      show: true,
+      success: false,
+      title: "Attendance Failed",
+      message: message,
+      action: "",
+    });
+  };
+
+  // =========================================================
   // SUBMIT ATTENDANCE
-  // --------------------------------------------------
+  // =========================================================
 
   const submitAttendance = async () => {
+    // -------------------------------------------------------
+    // VALIDATE MOBILE
+    // -------------------------------------------------------
+
     if (!mobileNumber) {
-      showError("Please enter your mobile number.");
+      showError(
+        "Please enter your mobile number."
+      );
+
       return;
     }
 
     if (!/^\d{10}$/.test(mobileNumber)) {
-      showError("Please enter a valid 10-digit mobile number.");
+      showError(
+        "Please enter a valid 10-digit mobile number."
+      );
+
       return;
     }
+
+    // -------------------------------------------------------
+    // VALIDATE LOCATION
+    // -------------------------------------------------------
 
     if (!location) {
-      showError("Location is not available. Please try again.");
+      showError(
+        "Location is not available. Please try again."
+      );
+
       return;
     }
 
+    // -------------------------------------------------------
+    // VALIDATE PHOTO
+    // -------------------------------------------------------
+
     if (!photo) {
-      showError("Please capture your selfie.");
+      showError(
+        "Please capture your selfie."
+      );
+
+      return;
+    }
+
+    // -------------------------------------------------------
+    // DON'T SUBMIT IF ALREADY COMPLETED
+    // -------------------------------------------------------
+
+    if (
+      attendanceStatus &&
+      attendanceStatus.status ===
+        "Punched Out"
+    ) {
+      showError(
+        "Your attendance for today is already completed."
+      );
+
       return;
     }
 
@@ -189,86 +405,270 @@ function App() {
 
       const date = getCurrentDate();
 
-      const attendanceData = {
-        mobileNumber,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        accuracy: location.accuracy,
-        date,
-      };
+      // =====================================================
+      // STEP 1
+      // UPLOAD IMAGE
+      // =====================================================
 
-      console.log("Sending attendance:", attendanceData);
+      setSubmitPhase("uploading");
 
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(attendanceData),
-      });
+      console.log(
+        "Uploading selfie..."
+      );
 
-      const data = await response.json();
+      const selfieUrl =
+        await uploadAttendanceImage(
+          photo,
+          mobileNumber
+        );
 
-      console.log("Attendance response:", data);
-
-      if (!response.ok) {
+      if (!selfieUrl) {
         throw new Error(
-          data.message || "Unable to submit attendance."
+          "Selfie upload failed. Attendance was not submitted."
         );
       }
 
-      // ----------------------------------------------
-      // SUCCESS
-      // ----------------------------------------------
+      console.log(
+        "Selfie uploaded successfully:"
+      );
 
-      const action = data.action || data.data?.status || "Attendance";
+      console.log(
+        selfieUrl
+      );
 
-      setShowMobileDialog(false);
+      // =====================================================
+      // STEP 2
+      // CREATE ATTENDANCE PAYLOAD
+      // =====================================================
 
-      setResponseDialog({
-        show: true,
-        success: true,
-        title:
-          action === "Punched In"
-            ? "Punch In Successful"
-            : "Punch Out Successful",
-        message:
-          action === "Punched In"
-            ? "Your attendance has been successfully punched in."
-            : "Your attendance has been successfully punched out.",
-        action,
-      });
+      const attendanceData = {
+        mobileNumber:
+          mobileNumber,
 
-      // Reset
+        date:
+          date,
+
+        latitude:
+          Number(
+            location.latitude
+          ),
+
+        longitude:
+          Number(
+            location.longitude
+          ),
+
+        accuracy:
+          Number(
+            location.accuracy
+          ),
+
+        selfieUrl:
+          selfieUrl,
+      };
+
+      console.log(
+        "================================"
+      );
+
+      console.log(
+        "SENDING ATTENDANCE"
+      );
+
+      console.log(
+        "Method: POST"
+      );
+
+      console.log(
+        "URL:",
+        API_URL
+      );
+
+      console.log(
+        "Payload:",
+        attendanceData
+      );
+
+      console.log(
+        "================================"
+      );
+
+      // =====================================================
+      // STEP 3
+      // POST ATTENDANCE
+      // =====================================================
+
+      setSubmitPhase("saving");
+
+      const response =
+        await fetch(
+          API_URL,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(
+                attendanceData
+              ),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      console.log(
+        "================================"
+      );
+
+      console.log(
+        "ATTENDANCE RESPONSE"
+      );
+
+      console.log(
+        "HTTP STATUS:",
+        response.status
+      );
+
+      console.log(
+        "Response:",
+        data
+      );
+
+      console.log(
+        "================================"
+      );
+
+      // =====================================================
+      // API ERROR
+      // =====================================================
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Unable to submit attendance."
+        );
+      }
+
+      // =====================================================
+      // PUNCH IN
+      // =====================================================
+
+      if (
+        data.action === "PUNCH_IN"
+      ) {
+        setShowMobileDialog(
+          false
+        );
+
+        setResponseDialog({
+          show: true,
+          success: true,
+          title:
+            "Punch In Successful",
+          message:
+            "Your attendance has been successfully punched in.",
+          action:
+            "PUNCH_IN",
+        });
+      }
+
+      // =====================================================
+      // PUNCH OUT
+      // =====================================================
+
+      else if (
+        data.action === "PUNCH_OUT"
+      ) {
+        setShowMobileDialog(
+          false
+        );
+
+        setResponseDialog({
+          show: true,
+          success: true,
+          title:
+            "Punch Out Successful",
+          message:
+            "Your attendance has been successfully punched out.",
+          action:
+            "PUNCH_OUT",
+        });
+      }
+
+      // =====================================================
+      // ALREADY COMPLETED
+      // =====================================================
+
+      else if (
+        data.action ===
+        "ALREADY_COMPLETED"
+      ) {
+        showError(
+          "Your attendance for today is already completed."
+        );
+
+        return;
+      }
+
+      // =====================================================
+      // OTHER SUCCESS RESPONSE
+      // =====================================================
+
+      else {
+        setShowMobileDialog(
+          false
+        );
+
+        setResponseDialog({
+          show: true,
+          success: true,
+          title:
+            "Attendance Successful",
+          message:
+            data.message ||
+            "Attendance submitted successfully.",
+          action:
+            data.action ||
+            "Attendance",
+        });
+      }
+
+      // =====================================================
+      // RESET
+      // =====================================================
+
       setMobileNumber("");
-      setAttendanceStatus(null);
+
+      setAttendanceStatus(
+        null
+      );
+
       setPhoto(null);
     } catch (error) {
-      console.error("Attendance submission error:", error);
+      console.error(
+        "Attendance submission error:",
+        error
+      );
 
-      showError(error.message || "Something went wrong.");
+      showError(
+        error.message ||
+          "Something went wrong."
+      );
     } finally {
       setSubmitting(false);
+
+      setSubmitPhase("idle");
     }
   };
 
-  // --------------------------------------------------
-  // ERROR DIALOG
-  // --------------------------------------------------
-
-  const showError = (message) => {
-    setResponseDialog({
-      show: true,
-      success: false,
-      title: "Attendance Failed",
-      message,
-      action: "",
-    });
-  };
-
-  // --------------------------------------------------
-  // CLOSE RESPONSE
-  // --------------------------------------------------
+  // =========================================================
+  // CLOSE RESPONSE DIALOG
+  // =========================================================
 
   const closeResponseDialog = () => {
     setResponseDialog({
@@ -280,94 +680,127 @@ function App() {
     });
   };
 
-  // --------------------------------------------------
+  // =========================================================
   // CLOSE MOBILE DIALOG
-  // --------------------------------------------------
+  // =========================================================
 
   const closeMobileDialog = () => {
-    if (submitting) return;
+    if (submitting) {
+      return;
+    }
 
     setShowMobileDialog(false);
+
     setMobileNumber("");
+
     setAttendanceStatus(null);
+
     setPhoto(null);
   };
 
-  // --------------------------------------------------
-  // RENDER
-  // --------------------------------------------------
+  // =========================================================
+  // UI
+  // =========================================================
 
   return (
     <div className="attendance-app">
 
-      {/* ==================================================
+      {/* ===================================================
           HEADER
-      ================================================== */}
+      =================================================== */}
 
       <header className="attendance-header">
+
         <div className="header-content">
 
           <div className="logo-section">
+
             <div className="logo-icon">
               ✓
             </div>
 
             <div>
-              <h1>Employee Attendance</h1>
-              <p>Daily Attendance System</p>
+
+              <h1>
+                Employee Attendance
+              </h1>
+
+              <p>
+                Daily Attendance System
+              </p>
+
             </div>
+
           </div>
 
           <div className="header-date">
-            <span>Today</span>
-            <strong>{getCurrentDate()}</strong>
+
+            <span>
+              Today
+            </span>
+
+            <strong>
+              {getCurrentDate()}
+            </strong>
+
           </div>
 
         </div>
+
       </header>
 
-
-      {/* ==================================================
+      {/* ===================================================
           MAIN
-      ================================================== */}
+      =================================================== */}
 
       <main className="attendance-main">
 
-        {/* --------------------------------------------------
-            STEP 1 - LOCATION
-        -------------------------------------------------- */}
+        {/* =================================================
+            STEP 1
+            GPS
+        ================================================= */}
 
-        <section className="attendance-card">
+        {!location && (
+          <section className="attendance-card">
 
-          <div className="card-header">
+            <div className="card-header">
 
-            <div className="step-number">
-              1
+              <div className="step-number">
+                1
+              </div>
+
+              <div>
+
+                <h2>
+                  Verify Your Location
+                </h2>
+
+                <p>
+                  Your location must be verified
+                  before attendance.
+                </p>
+
+              </div>
+
             </div>
 
-            <div>
-              <h2>Verify Your Location</h2>
-              <p>
-                Your location must be verified before attendance.
-              </p>
+            <div className="location-container">
+
+              <GPSLocation
+                onLocationReady={
+                  handleLocationReady
+                }
+              />
+
             </div>
 
-          </div>
+          </section>
+        )}
 
-          <div className="location-container">
-
-            <GPSLocation
-              onLocationReady={handleLocationReady}
-            />
-
-          </div>
-
-        </section>
-
-
-        {/* --------------------------------------------------
-            STEP 2 - CAMERA
-        -------------------------------------------------- */}
+        {/* =================================================
+            STEP 2
+            CAMERA
+        ================================================= */}
 
         {location && (
           <section className="attendance-card">
@@ -379,10 +812,16 @@ function App() {
               </div>
 
               <div>
-                <h2>Capture Selfie</h2>
+
+                <h2>
+                  Capture Selfie
+                </h2>
+
                 <p>
-                  Take a clear selfie to verify your attendance.
+                  Take a clear selfie to verify
+                  your attendance.
                 </p>
+
               </div>
 
             </div>
@@ -390,7 +829,9 @@ function App() {
             <div className="camera-container">
 
               <Camera
-                onPhotoTaken={handlePhotoTaken}
+                onPhotoTaken={
+                  handlePhotoTaken
+                }
               />
 
             </div>
@@ -400,17 +841,16 @@ function App() {
 
       </main>
 
-
-      {/* ==================================================
+      {/* ===================================================
           MOBILE NUMBER DIALOG
-      ================================================== */}
+      =================================================== */}
 
       {showMobileDialog && (
         <div className="dialog-overlay">
 
           <div className="mobile-dialog">
 
-            {/* Header */}
+            {/* HEADER */}
 
             <div className="dialog-header">
 
@@ -419,25 +859,33 @@ function App() {
               </div>
 
               <div>
-                <h2>Employee Verification</h2>
+
+                <h2>
+                  Employee Verification
+                </h2>
 
                 <p>
-                  Enter your registered mobile number
+                  Enter your registered mobile
+                  number
                 </p>
+
               </div>
 
               <button
                 className="close-button"
-                onClick={closeMobileDialog}
-                disabled={submitting}
+                onClick={
+                  closeMobileDialog
+                }
+                disabled={
+                  submitting
+                }
               >
                 ×
               </button>
 
             </div>
 
-
-            {/* Body */}
+            {/* BODY */}
 
             <div className="dialog-body">
 
@@ -452,49 +900,72 @@ function App() {
                 </span>
 
                 <input
-                  ref={mobileInputRef}
+                  ref={
+                    mobileInputRef
+                  }
                   id="mobileNumber"
                   type="tel"
                   inputMode="numeric"
                   maxLength={10}
                   placeholder="Enter 10 digit mobile number"
-                  value={mobileNumber}
-                  onChange={handleMobileChange}
-                  disabled={submitting}
+                  value={
+                    mobileNumber
+                  }
+                  onChange={
+                    handleMobileChange
+                  }
+                  disabled={
+                    submitting
+                  }
                 />
 
               </div>
 
+              {/* =================================================
+                  ATTENDANCE STATUS
+              ================================================= */}
 
-              {/* STATUS */}
-
-              {mobileNumber.length === 10 && (
+              {mobileNumber.length ===
+                10 && (
                 <div className="attendance-status-box">
 
                   {checkingStatus ? (
 
                     <div className="status-loading">
+
                       <span className="spinner small"></span>
+
                       Checking attendance...
+
                     </div>
 
                   ) : !attendanceStatus ||
-                    attendanceStatus.exists === false ? (
+                    attendanceStatus.exists ===
+                      false ? (
 
                     <div className="status-new">
+
                       <span className="status-icon">
                         ✓
                       </span>
 
                       <div>
-                        <strong>Ready to Punch In</strong>
+
+                        <strong>
+                          Ready to Punch In
+                        </strong>
+
                         <p>
-                          No attendance found for today.
+                          No attendance found
+                          for today.
                         </p>
+
                       </div>
+
                     </div>
 
-                  ) : attendanceStatus.status === "Punched In" ? (
+                  ) : attendanceStatus.status ===
+                    "Punched In" ? (
 
                     <div className="status-punched-in">
 
@@ -503,11 +974,16 @@ function App() {
                       </span>
 
                       <div>
-                        <strong>Already Punched In</strong>
+
+                        <strong>
+                          Already Punched In
+                        </strong>
 
                         <p>
-                          Your next action will be Punch Out.
+                          Your next action
+                          will be Punch Out.
                         </p>
+
                       </div>
 
                     </div>
@@ -521,11 +997,16 @@ function App() {
                       </span>
 
                       <div>
-                        <strong>Attendance Completed</strong>
+
+                        <strong>
+                          Attendance Completed
+                        </strong>
 
                         <p>
-                          You have already punched out today.
+                          You have already
+                          punched out today.
                         </p>
+
                       </div>
 
                     </div>
@@ -535,83 +1016,117 @@ function App() {
                 </div>
               )}
 
-
-              {/* INFO */}
+              {/* =================================================
+                  ATTENDANCE INFO
+              ================================================= */}
 
               <div className="attendance-info">
 
                 <div className="info-row">
-                  <span>📍</span>
+
+                  <span>
+                    📍
+                  </span>
+
                   <div>
-                    <strong>Location</strong>
+
+                    <strong>
+                      Location
+                    </strong>
+
                     <small>
                       {location
                         ? "Verified"
                         : "Not available"}
                     </small>
+
                   </div>
+
                 </div>
 
-
                 <div className="info-row">
-                  <span>📸</span>
+
+                  <span>
+                    📸
+                  </span>
 
                   <div>
-                    <strong>Selfie</strong>
+
+                    <strong>
+                      Selfie
+                    </strong>
 
                     <small>
                       {photo
                         ? "Captured"
                         : "Not captured"}
                     </small>
+
                   </div>
+
                 </div>
 
-
                 <div className="info-row">
-                  <span>📅</span>
+
+                  <span>
+                    📅
+                  </span>
 
                   <div>
-                    <strong>Date</strong>
+
+                    <strong>
+                      Date
+                    </strong>
 
                     <small>
                       {getCurrentDate()}
                     </small>
+
                   </div>
+
                 </div>
 
               </div>
 
             </div>
 
-
-            {/* Footer */}
+            {/* =================================================
+                FOOTER
+            ================================================= */}
 
             <div className="dialog-footer">
 
               <button
                 type="button"
                 className="cancel-button"
-                onClick={closeMobileDialog}
-                disabled={submitting}
+                onClick={
+                  closeMobileDialog
+                }
+                disabled={
+                  submitting
+                }
               >
                 Cancel
               </button>
 
-
               <button
                 type="button"
                 className={`submit-button ${
-                  attendanceStatus?.status === "Punched In"
+                  attendanceStatus?.status ===
+                  "Punched In"
                     ? "punch-out"
                     : ""
                 }`}
-                onClick={submitAttendance}
+                onClick={
+                  submitAttendance
+                }
                 disabled={
                   submitting ||
                   checkingStatus ||
-                  mobileNumber.length !== 10 ||
-                  attendanceStatus?.status === "Punched Out"
+                  mobileNumber.length !==
+                    10 ||
+                  attendanceStatus?.status ===
+                    "Punched Out"
                 }
               >
 
@@ -619,14 +1134,21 @@ function App() {
 
                   <>
                     <span className="spinner"></span>
-                    Processing...
+
+                    {submitPhase ===
+                    "uploading"
+                      ? "Uploading selfie..."
+                      : "Saving attendance..."}
                   </>
 
                 ) : (
 
                   <>
                     {getActionText()}
-                    <span>→</span>
+
+                    <span>
+                      →
+                    </span>
                   </>
 
                 )}
@@ -640,10 +1162,9 @@ function App() {
         </div>
       )}
 
-
-      {/* ==================================================
+      {/* ===================================================
           RESPONSE DIALOG
-      ================================================== */}
+      =================================================== */}
 
       {responseDialog.show && (
         <div className="dialog-overlay">
@@ -657,21 +1178,18 @@ function App() {
                   : "error"
               }`}
             >
-
-              {responseDialog.success ? "✓" : "!"}
-
+              {responseDialog.success
+                ? "✓"
+                : "!"}
             </div>
-
 
             <h2>
               {responseDialog.title}
             </h2>
 
-
             <p>
               {responseDialog.message}
             </p>
-
 
             {responseDialog.action && (
               <div className="action-result">
@@ -687,10 +1205,11 @@ function App() {
               </div>
             )}
 
-
             <button
               className="response-button"
-              onClick={closeResponseDialog}
+              onClick={
+                closeResponseDialog
+              }
             >
               Done
             </button>

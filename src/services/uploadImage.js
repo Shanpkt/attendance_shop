@@ -1,0 +1,71 @@
+import { supabase } from "../config/supabase";
+
+const STORAGE_BUCKET = "ATTENDANCE";
+
+const dataUrlToBlob = async (image) => {
+  if (!image || typeof image !== "string") {
+    throw new Error("Selfie image is missing.");
+  }
+
+  if (image.startsWith("blob:")) {
+    const response = await fetch(image);
+    return response.blob();
+  }
+
+  const parts = image.split(",");
+
+  if (parts.length < 2) {
+    throw new Error("Invalid selfie image.");
+  }
+
+  const mimeMatch = parts[0].match(/data:(.*?);/);
+  const mime = mimeMatch?.[1] || "image/jpeg";
+  const binary = atob(parts[1]);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return new Blob([bytes], { type: mime });
+};
+
+export const uploadAttendanceImage = async (
+  base64Image,
+  mobileNumber
+) => {
+  if (!/^\d{10}$/.test(mobileNumber)) {
+    throw new Error(
+      "A valid mobile number is required before uploading the selfie."
+    );
+  }
+
+  const blob = await dataUrlToBlob(base64Image);
+
+  const fileName = `${mobileNumber}/${Date.now()}.jpg`;
+
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(fileName, blob, {
+      contentType: "image/jpeg",
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (error) {
+    console.error("Supabase upload error:", error);
+    throw new Error(
+      error.message || "Unable to upload selfie to storage."
+    );
+  }
+
+  const { data: urlData } = supabase.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(data.path);
+
+  if (!urlData?.publicUrl) {
+    throw new Error("Selfie uploaded but no public URL was returned.");
+  }
+
+  return urlData.publicUrl;
+};
