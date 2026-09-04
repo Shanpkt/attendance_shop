@@ -50,7 +50,7 @@ function GPSLocation({ onLocationReady }) {
         // ACCURACY GOOD
         // ======================================
 
-        if (accuracy <= 150) {
+        if (accuracy <= 250) {
           const locationData = {
             latitude,
             longitude,
