@@ -65,5 +65,49 @@ export const uploadAttendanceImage = async (
     throw new Error("Selfie uploaded but no public URL was returned.");
   }
 
-  return urlData.publicUrl;
+  return {
+    publicUrl: urlData.publicUrl,
+    path: data.path,
+  };
+};
+
+const getStoragePathFromPublicUrl = (publicUrl) => {
+  if (!publicUrl) {
+    return "";
+  }
+
+  const marker = `/object/public/${STORAGE_BUCKET}/`;
+  const index = publicUrl.indexOf(marker);
+
+  if (index === -1) {
+    return "";
+  }
+
+  return decodeURIComponent(
+    publicUrl.slice(index + marker.length).split("?")[0]
+  );
+};
+
+export const deleteAttendanceImage = async (
+  publicUrl,
+  storagePath
+) => {
+  const path =
+    storagePath ||
+    getStoragePathFromPublicUrl(publicUrl);
+
+  if (!path) {
+    throw new Error("Selfie path is missing.");
+  }
+
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .remove([path]);
+
+  if (error) {
+    console.error("Supabase delete error:", error);
+    throw new Error(
+      error.message || "Unable to delete selfie from storage."
+    );
+  }
 };

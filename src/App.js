@@ -6,7 +6,10 @@ import React, {
 
 import GPSLocation from "./gps.jsx";
 import Camera from "./camera";
-import { uploadAttendanceImage } from "./services/uploadImage";
+import {
+  deleteAttendanceImage,
+  uploadAttendanceImage,
+} from "./services/uploadImage";
 
 import "./App.scss";
 
@@ -30,6 +33,8 @@ function App() {
   const [photo, setPhoto] = useState(null);
 
   const [selfieUrl, setSelfieUrl] = useState(null);
+
+  const [selfiePath, setSelfiePath] = useState(null);
 
   const [cameraResetKey, setCameraResetKey] =
     useState(0);
@@ -155,6 +160,7 @@ function App() {
 
       setPhoto(image);
       setSelfieUrl(null);
+      setSelfiePath(null);
       setShowPhotoDialog(true);
     },
     []
@@ -163,6 +169,7 @@ function App() {
   const resetCamera = () => {
     setPhoto(null);
     setSelfieUrl(null);
+    setSelfiePath(null);
     setCameraResetKey((key) => key + 1);
   };
 
@@ -184,16 +191,17 @@ function App() {
     try {
       setUploadingPhoto(true);
 
-      const uploadedUrl =
+      const uploaded =
         await uploadAttendanceImage(photo);
 
-      if (!uploadedUrl) {
+      if (!uploaded?.publicUrl) {
         throw new Error(
           "Selfie upload failed. Please try again."
         );
       }
 
-      setSelfieUrl(uploadedUrl);
+      setSelfieUrl(uploaded.publicUrl);
+      setSelfiePath(uploaded.path || null);
       setShowPhotoDialog(false);
       setShowMobileDialog(true);
 
@@ -300,6 +308,61 @@ function App() {
   };
 
   // =========================================================
+  // DELETE SELFIE FOR UNREGISTERED EMPLOYEE
+  // =========================================================
+
+  const discardUnregisteredSelfie = async () => {
+    const uploadedUrl = selfieUrl;
+    const uploadedPath = selfiePath;
+
+    try {
+      if (uploadedUrl || uploadedPath) {
+        await deleteAttendanceImage(
+          uploadedUrl,
+          uploadedPath
+        );
+      }
+
+      setShowMobileDialog(false);
+      setMobileNumber("");
+      setEmployee(null);
+      setAttendanceStatus(null);
+      resetCamera();
+
+      setResponseDialog({
+        show: true,
+        success: true,
+        title:
+          "Selfie Deleted Successfully",
+        message:
+          "This mobile number is not registered. Your selfie has been deleted. Please capture your photo again.",
+        action: "",
+      });
+    } catch (error) {
+      console.error(
+        "Selfie delete error:",
+        error
+      );
+
+      setShowMobileDialog(false);
+      setMobileNumber("");
+      setEmployee(null);
+      setAttendanceStatus(null);
+      resetCamera();
+
+      setResponseDialog({
+        show: true,
+        success: false,
+        title: "Selfie Delete Failed",
+        message:
+          error.message ||
+          "This mobile number is not registered. Please capture your photo again.",
+        action: "",
+      });
+    }
+  };
+
+  // =========================================================
   // VERIFY REGISTERED EMPLOYEE
   // =========================================================
 
@@ -346,6 +409,8 @@ function App() {
         });
 
         setAttendanceStatus(null);
+
+        await discardUnregisteredSelfie();
 
         return;
       }
@@ -740,6 +805,7 @@ function App() {
 
       setPhoto(null);
       setSelfieUrl(null);
+      setSelfiePath(null);
       setCameraResetKey((key) => key + 1);
     } catch (error) {
       console.error(
@@ -775,7 +841,7 @@ function App() {
   // =========================================================
 
   const closeMobileDialog = () => {
-    if (submitting) {
+    if (submitting || checkingStatus) {
       return;
     }
 
@@ -789,6 +855,7 @@ function App() {
 
     setPhoto(null);
     setSelfieUrl(null);
+    setSelfiePath(null);
     setCameraResetKey((key) => key + 1);
   };
 
@@ -1073,7 +1140,8 @@ function App() {
                   closeMobileDialog
                 }
                 disabled={
-                  submitting
+                  submitting ||
+                  checkingStatus
                 }
               >
                 ×
@@ -1111,7 +1179,8 @@ function App() {
                     handleMobileChange
                   }
                   disabled={
-                    submitting
+                    submitting ||
+                    checkingStatus
                   }
                 />
 
@@ -1131,7 +1200,10 @@ function App() {
 
                       <span className="spinner small"></span>
 
-                      Verifying employee...
+                      {employee?.registered ===
+                      false
+                        ? "Deleting selfie..."
+                        : "Verifying employee..."}
 
                     </div>
 
@@ -1352,7 +1424,8 @@ function App() {
                   closeMobileDialog
                 }
                 disabled={
-                  submitting
+                  submitting ||
+                  checkingStatus
                 }
               >
                 Cancel
