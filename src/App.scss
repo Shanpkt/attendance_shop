@@ -921,7 +921,8 @@ body {
 .status-loading,
 .status-new,
 .status-punched-in,
-.status-completed {
+.status-completed,
+.status-unregistered {
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -929,6 +930,10 @@ body {
 
 .status-new {
   color: #0f7b3b;
+}
+
+.status-unregistered {
+  color: #b42318;
 }
 
 .status-completed {

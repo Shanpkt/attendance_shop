@@ -13,6 +13,9 @@ import "./App.scss";
 const API_URL =
   "https://attendance-backend-hs75.onrender.com/api/attendance";
 
+const EMPLOYEES_API_URL =
+  "https://attendance-backend-hs75.onrender.com/api/employees";
+
 function App() {
   // =========================================================
   // LOCATION
@@ -60,6 +63,9 @@ function App() {
 
   const [checkingStatus, setCheckingStatus] =
     useState(false);
+
+  const [employee, setEmployee] =
+    useState(null);
 
   // =========================================================
   // SUBMITTING
@@ -222,8 +228,6 @@ function App() {
     }
 
     try {
-      setCheckingStatus(true);
-
       const date = getCurrentDate();
 
       const statusUrl =
@@ -292,6 +296,76 @@ function App() {
       );
 
       setAttendanceStatus(null);
+    }
+  };
+
+  // =========================================================
+  // VERIFY REGISTERED EMPLOYEE
+  // =========================================================
+
+  const verifyEmployeeThenCheckStatus = async (
+    number
+  ) => {
+    if (!/^\d{10}$/.test(number)) {
+      setEmployee(null);
+      setAttendanceStatus(null);
+      return;
+    }
+
+    try {
+      setCheckingStatus(true);
+      setEmployee(null);
+      setAttendanceStatus(null);
+
+      const response =
+        await fetch(EMPLOYEES_API_URL);
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Unable to verify employee."
+        );
+      }
+
+      const matchedEmployee = (
+        Array.isArray(data.data)
+          ? data.data
+          : []
+      ).find(
+        (item) =>
+          String(item.mobileNumber) ===
+          String(number)
+      );
+
+      if (!matchedEmployee) {
+        setEmployee({
+          registered: false,
+        });
+
+        setAttendanceStatus(null);
+
+        return;
+      }
+
+      setEmployee({
+        registered: true,
+        name: matchedEmployee.name,
+        mobileNumber:
+          matchedEmployee.mobileNumber,
+      });
+
+      await checkAttendanceStatus(number);
+    } catch (error) {
+      console.error(
+        "Employee verification error:",
+        error
+      );
+
+      setEmployee(null);
+      setAttendanceStatus(null);
     } finally {
       setCheckingStatus(false);
     }
@@ -310,8 +384,9 @@ function App() {
     setMobileNumber(value);
 
     if (value.length === 10) {
-      checkAttendanceStatus(value);
+      verifyEmployeeThenCheckStatus(value);
     } else {
+      setEmployee(null);
       setAttendanceStatus(null);
     }
   };
@@ -323,6 +398,13 @@ function App() {
   const getActionText = () => {
     if (checkingStatus) {
       return "Checking...";
+    }
+
+    if (
+      !employee ||
+      employee.registered !== true
+    ) {
+      return "Not Registered";
     }
 
     if (
@@ -383,6 +465,22 @@ function App() {
     if (!/^\d{10}$/.test(mobileNumber)) {
       showError(
         "Please enter a valid 10-digit mobile number."
+      );
+
+      return;
+    }
+
+    // -------------------------------------------------------
+    // REGISTERED EMPLOYEE ONLY
+    // -------------------------------------------------------
+
+    if (
+      !employee ||
+      employee.registered !== true
+    ) {
+      showError(
+        "This mobile number is not registered. Punch In and Punch Out are allowed only for registered employees.",
+        "Employee Not Registered"
       );
 
       return;
@@ -634,6 +732,8 @@ function App() {
 
       setMobileNumber("");
 
+      setEmployee(null);
+
       setAttendanceStatus(
         null
       );
@@ -682,6 +782,8 @@ function App() {
     setShowMobileDialog(false);
 
     setMobileNumber("");
+
+    setEmployee(null);
 
     setAttendanceStatus(null);
 
@@ -1029,7 +1131,57 @@ function App() {
 
                       <span className="spinner small"></span>
 
-                      Checking attendance...
+                      Verifying employee...
+
+                    </div>
+
+                  ) : employee?.registered ===
+                    false ? (
+
+                    <div className="status-unregistered">
+
+                      <span className="status-icon">
+                        !
+                      </span>
+
+                      <div>
+
+                        <strong>
+                          Employee Not Registered
+                        </strong>
+
+                        <p>
+                          Punch In and Punch Out
+                          are allowed only for
+                          registered employees.
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                  ) : employee?.registered !==
+                    true ? (
+
+                    <div className="status-unregistered">
+
+                      <span className="status-icon">
+                        !
+                      </span>
+
+                      <div>
+
+                        <strong>
+                          Verification Failed
+                        </strong>
+
+                        <p>
+                          Unable to verify this
+                          mobile number. Please
+                          try again.
+                        </p>
+
+                      </div>
 
                     </div>
 
@@ -1050,8 +1202,9 @@ function App() {
                         </strong>
 
                         <p>
-                          No attendance found
-                          for today.
+                          {employee.name
+                            ? `${employee.name} is registered. No attendance found for today.`
+                            : "No attendance found for today."}
                         </p>
 
                       </div>
@@ -1221,6 +1374,8 @@ function App() {
                   checkingStatus ||
                   mobileNumber.length !==
                     10 ||
+                  employee?.registered !==
+                    true ||
                   attendanceStatus?.status ===
                     "Punched Out"
                 }
