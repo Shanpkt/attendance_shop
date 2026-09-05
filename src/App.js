@@ -46,6 +46,9 @@ function App() {
   const [showPhotoDialog, setShowPhotoDialog] =
     useState(false);
 
+  const [uploadingPhoto, setUploadingPhoto] =
+    useState(false);
+
   // =========================================================
   // MOBILE NUMBER DIALOG
   // =========================================================
@@ -94,6 +97,8 @@ function App() {
   // =========================================================
 
   const mobileInputRef = useRef(null);
+  const selfieUrlRef = useRef(null);
+  const selfiePathRef = useRef(null);
 
   // =========================================================
   // CURRENT DATE
@@ -156,6 +161,8 @@ function App() {
       }
 
       setPhoto(image);
+      selfieUrlRef.current = null;
+      selfiePathRef.current = null;
       setSelfieUrl(null);
       setSelfiePath(null);
       setShowPhotoDialog(true);
@@ -165,32 +172,63 @@ function App() {
 
   const resetCamera = () => {
     setPhoto(null);
+    selfieUrlRef.current = null;
+    selfiePathRef.current = null;
     setSelfieUrl(null);
     setSelfiePath(null);
     setCameraResetKey((key) => key + 1);
   };
 
   const closePhotoDialog = () => {
+    if (uploadingPhoto) {
+      return;
+    }
+
     setShowPhotoDialog(false);
     resetCamera();
   };
 
-  const submitPhoto = () => {
+  const submitPhoto = async () => {
     if (!photo) {
       showError("Please capture your selfie.");
       return;
     }
 
-    setSelfieUrl(null);
-    setSelfiePath(null);
-    setShowPhotoDialog(false);
-    setShowMobileDialog(true);
+    try {
+      setUploadingPhoto(true);
 
-    setTimeout(() => {
-      if (mobileInputRef.current) {
-        mobileInputRef.current.focus();
+      const uploaded =
+        await uploadAttendanceImage(photo);
+
+      if (!uploaded?.publicUrl || !uploaded?.path) {
+        throw new Error(
+          "Selfie upload failed. Please try again."
+        );
       }
-    }, 200);
+
+      selfieUrlRef.current = uploaded.publicUrl;
+      selfiePathRef.current = uploaded.path;
+      setSelfieUrl(uploaded.publicUrl);
+      setSelfiePath(uploaded.path);
+      setShowPhotoDialog(false);
+      setShowMobileDialog(true);
+
+      setTimeout(() => {
+        if (mobileInputRef.current) {
+          mobileInputRef.current.focus();
+        }
+      }, 200);
+    } catch (error) {
+      console.error("Selfie upload error:", error);
+
+      showError(
+        error.message ||
+          "Unable to submit photo. Please try again.",
+        "Photo Submit Failed"
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   // =========================================================
@@ -282,16 +320,20 @@ function App() {
   // =========================================================
 
   const discardUnregisteredSelfie = async () => {
-    const uploadedUrl = selfieUrl;
-    const uploadedPath = selfiePath;
+    const uploadedUrl = selfieUrlRef.current || selfieUrl;
+    const uploadedPath = selfiePathRef.current || selfiePath;
 
     try {
-      if (uploadedUrl || uploadedPath) {
-        await deleteAttendanceImage(
-          uploadedUrl,
-          uploadedPath
+      if (!uploadedUrl && !uploadedPath) {
+        throw new Error(
+          "Selfie was not uploaded, so it could not be deleted."
         );
       }
+
+      await deleteAttendanceImage(
+        uploadedUrl,
+        uploadedPath
+      );
 
       setShowMobileDialog(false);
       setMobileNumber("");
@@ -566,20 +608,27 @@ function App() {
 
       const date = getCurrentDate();
 
-      const uploaded =
-        await uploadAttendanceImage(
-          photo,
-          mobileNumber
-        );
+      let punchSelfieUrl = selfieUrlRef.current || selfieUrl;
 
-      if (!uploaded?.publicUrl) {
-        throw new Error(
-          "Selfie upload failed. Please try again."
-        );
+      if (!punchSelfieUrl) {
+        const uploaded =
+          await uploadAttendanceImage(
+            photo,
+            mobileNumber
+          );
+
+        if (!uploaded?.publicUrl) {
+          throw new Error(
+            "Selfie upload failed. Please try again."
+          );
+        }
+
+        punchSelfieUrl = uploaded.publicUrl;
+        selfieUrlRef.current = uploaded.publicUrl;
+        selfiePathRef.current = uploaded.path || null;
+        setSelfieUrl(uploaded.publicUrl);
+        setSelfiePath(uploaded.path || null);
       }
-
-      setSelfieUrl(uploaded.publicUrl);
-      setSelfiePath(uploaded.path || null);
 
       const attendanceData = {
         mobileNumber:
@@ -604,7 +653,7 @@ function App() {
           ),
 
         selfieUrl:
-          uploaded.publicUrl,
+          punchSelfieUrl,
       };
 
       console.log(
@@ -788,10 +837,7 @@ function App() {
         null
       );
 
-      setPhoto(null);
-      setSelfieUrl(null);
-      setSelfiePath(null);
-      setCameraResetKey((key) => key + 1);
+      resetCamera();
     } catch (error) {
       console.error(
         "Attendance submission error:",
@@ -838,10 +884,7 @@ function App() {
 
     setAttendanceStatus(null);
 
-    setPhoto(null);
-    setSelfieUrl(null);
-    setSelfiePath(null);
-    setCameraResetKey((key) => key + 1);
+    resetCamera();
   };
 
   // =========================================================
@@ -922,7 +965,7 @@ function App() {
                 </h2>
 
                 <p>
-                  You must be within 600 meters of
+                  You must be within 120 meters of
                   the office location saved in
                   admin settings.
                 </p>
@@ -983,6 +1026,7 @@ function App() {
                   cameraResetKey
                 }
                 disabled={
+                  uploadingPhoto ||
                   submitting
                 }
               />
@@ -1025,6 +1069,7 @@ function App() {
               <button
                 className="close-button"
                 onClick={closePhotoDialog}
+                disabled={uploadingPhoto}
               >
                 ×
               </button>
@@ -1054,6 +1099,7 @@ function App() {
                 type="button"
                 className="cancel-button"
                 onClick={closePhotoDialog}
+                disabled={uploadingPhoto}
               >
                 Retake
               </button>
@@ -1062,10 +1108,19 @@ function App() {
                 type="button"
                 className="submit-button"
                 onClick={submitPhoto}
-                disabled={!photo}
+                disabled={uploadingPhoto || !photo}
               >
-                  Submit Photo
-                  <span>→</span>
+                {uploadingPhoto ? (
+                  <>
+                    <span className="spinner"></span>
+                    Submitting photo...
+                  </>
+                ) : (
+                  <>
+                    Submit Photo
+                    <span>→</span>
+                  </>
+                )}
               </button>
 
             </div>

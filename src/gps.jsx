@@ -11,7 +11,7 @@ function GPSLocation({ onLocationReady }) {
   const [loading, setLoading] = useState(true);
   const [currentAccuracy, setCurrentAccuracy] = useState(null);
   const [currentDistance, setCurrentDistance] = useState(null);
-  const [officeRadius, setOfficeRadius] = useState(600);
+  const [officeRadius, setOfficeRadius] = useState(120);
   const [error, setError] = useState("");
 
   const onLocationReadyRef = useRef(onLocationReady);
