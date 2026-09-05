@@ -182,45 +182,22 @@ function App() {
     resetCamera();
   };
 
-  const submitPhoto = async () => {
+  const submitPhoto = () => {
     if (!photo) {
       showError("Please capture your selfie.");
       return;
     }
 
-    try {
-      setUploadingPhoto(true);
+    setSelfieUrl(null);
+    setSelfiePath(null);
+    setShowPhotoDialog(false);
+    setShowMobileDialog(true);
 
-      const uploaded =
-        await uploadAttendanceImage(photo);
-
-      if (!uploaded?.publicUrl) {
-        throw new Error(
-          "Selfie upload failed. Please try again."
-        );
+    setTimeout(() => {
+      if (mobileInputRef.current) {
+        mobileInputRef.current.focus();
       }
-
-      setSelfieUrl(uploaded.publicUrl);
-      setSelfiePath(uploaded.path || null);
-      setShowPhotoDialog(false);
-      setShowMobileDialog(true);
-
-      setTimeout(() => {
-        if (mobileInputRef.current) {
-          mobileInputRef.current.focus();
-        }
-      }, 200);
-    } catch (error) {
-      console.error("Selfie upload error:", error);
-
-      showError(
-        error.message ||
-          "Unable to submit photo. Please try again.",
-        "Photo Submit Failed"
-      );
-    } finally {
-      setUploadingPhoto(false);
-    }
+    }, 200);
   };
 
   // =========================================================
@@ -567,7 +544,7 @@ function App() {
     // VALIDATE PHOTO
     // -------------------------------------------------------
 
-    if (!photo || !selfieUrl) {
+    if (!photo) {
       showError(
         "Please capture and submit your selfie."
       );
@@ -596,6 +573,21 @@ function App() {
 
       const date = getCurrentDate();
 
+      const uploaded =
+        await uploadAttendanceImage(
+          photo,
+          mobileNumber
+        );
+
+      if (!uploaded?.publicUrl) {
+        throw new Error(
+          "Selfie upload failed. Please try again."
+        );
+      }
+
+      setSelfieUrl(uploaded.publicUrl);
+      setSelfiePath(uploaded.path || null);
+
       const attendanceData = {
         mobileNumber:
           mobileNumber,
@@ -619,7 +611,7 @@ function App() {
           ),
 
         selfieUrl:
-          selfieUrl,
+          uploaded.publicUrl,
       };
 
       console.log(
@@ -1379,7 +1371,7 @@ function App() {
                       {selfieUrl
                         ? "Submitted"
                         : photo
-                          ? "Captured"
+                          ? "Confirmed"
                           : "Not captured"}
                     </small>
 
