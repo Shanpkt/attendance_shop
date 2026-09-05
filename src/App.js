@@ -46,9 +46,6 @@ function App() {
   const [showPhotoDialog, setShowPhotoDialog] =
     useState(false);
 
-  const [uploadingPhoto, setUploadingPhoto] =
-    useState(false);
-
   // =========================================================
   // MOBILE NUMBER DIALOG
   // =========================================================
@@ -174,10 +171,6 @@ function App() {
   };
 
   const closePhotoDialog = () => {
-    if (uploadingPhoto) {
-      return;
-    }
-
     setShowPhotoDialog(false);
     resetCamera();
   };
@@ -990,7 +983,6 @@ function App() {
                   cameraResetKey
                 }
                 disabled={
-                  uploadingPhoto ||
                   submitting
                 }
               />
@@ -1033,7 +1025,6 @@ function App() {
               <button
                 className="close-button"
                 onClick={closePhotoDialog}
-                disabled={uploadingPhoto}
               >
                 ×
               </button>
@@ -1063,7 +1054,6 @@ function App() {
                 type="button"
                 className="cancel-button"
                 onClick={closePhotoDialog}
-                disabled={uploadingPhoto}
               >
                 Retake
               </button>
@@ -1072,21 +1062,10 @@ function App() {
                 type="button"
                 className="submit-button"
                 onClick={submitPhoto}
-                disabled={uploadingPhoto || !photo}
+                disabled={!photo}
               >
-
-                {uploadingPhoto ? (
-                  <>
-                    <span className="spinner"></span>
-                    Submitting photo...
-                  </>
-                ) : (
-                  <>
-                    Submit Photo
-                    <span>→</span>
-                  </>
-                )}
-
+                  Submit Photo
+                  <span>→</span>
               </button>
 
             </div>
