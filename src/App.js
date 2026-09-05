@@ -929,7 +929,7 @@ function App() {
                 </h2>
 
                 <p>
-                  You must be within 100 meters of
+                  You must be within 600 meters of
                   the office location saved in
                   admin settings.
                 </p>
