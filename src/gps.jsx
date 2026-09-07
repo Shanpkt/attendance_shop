@@ -159,7 +159,7 @@ function GPSLocation({ onLocationReady }) {
             data?.tolerance
           ),
           maxAccuracy: getMaxGpsAccuracyMeters(
-            data?.accuracy
+            data?.punchAccuracy ?? data?.accuracy
           ),
           keepGpsTolerance: shouldKeepGpsTolerance(
             data?.gpsTolerance
