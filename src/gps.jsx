@@ -15,7 +15,7 @@ function GPSLocation({ onLocationReady }) {
   const [currentAccuracy, setCurrentAccuracy] = useState(null);
   const [currentDistance, setCurrentDistance] = useState(null);
   const [officeRadius, setOfficeRadius] = useState(30);
-  const [maxAccuracy, setMaxAccuracy] = useState(120);
+  const [maxAccuracy, setMaxAccuracy] = useState(30);
   const [keepGpsTolerance, setKeepGpsTolerance] = useState(true);
   const [error, setError] = useState("");
 

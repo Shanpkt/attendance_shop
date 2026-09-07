@@ -1,9 +1,9 @@
 export const SETTINGS_API =
   "https://attendance-backend-hs75.onrender.com/api/settings";
 
-export const DEFAULT_GEOFENCE_METERS = 120;
+export const DEFAULT_GEOFENCE_METERS = 30;
 
-export const MAX_GPS_ACCURACY_METERS = 120;
+export const MAX_GPS_ACCURACY_METERS = 30;
 
 export const getDistanceInMeters = (
   lat1,
