@@ -155,7 +155,9 @@ function GPSLocation({ onLocationReady }) {
         const office = {
           latitude,
           longitude,
-          radius: getGeofenceRadius(),
+          radius: getGeofenceRadius(
+            data?.tolerance
+          ),
           maxAccuracy: getMaxGpsAccuracyMeters(
             data?.accuracy
           ),

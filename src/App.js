@@ -965,9 +965,8 @@ function App() {
                 </h2>
 
                 <p>
-                  You must be within 30 meters of
-                  the office location saved in
-                  admin settings.
+                  You must be within the office
+                  area set in admin settings.
                 </p>
 
               </div>

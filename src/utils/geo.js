@@ -32,7 +32,13 @@ export const getDistanceInMeters = (
   );
 };
 
-export const getGeofenceRadius = () => {
+export const getGeofenceRadius = (tolerance) => {
+  const number = Number(tolerance);
+
+  if (Number.isFinite(number) && number > 0) {
+    return number;
+  }
+
   return DEFAULT_GEOFENCE_METERS;
 };
 
