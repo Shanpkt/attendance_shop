@@ -35,3 +35,28 @@ export const getDistanceInMeters = (
 export const getGeofenceRadius = () => {
   return DEFAULT_GEOFENCE_METERS;
 };
+
+export const shouldKeepGpsTolerance = (value) => {
+  if (
+    value === false ||
+    value === "false" ||
+    value === 0 ||
+    value === "0"
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+export const getMaxGpsAccuracyMeters = (
+  accuracy
+) => {
+  const number = Number(accuracy);
+
+  if (Number.isFinite(number) && number >= 0) {
+    return number;
+  }
+
+  return MAX_GPS_ACCURACY_METERS;
+};

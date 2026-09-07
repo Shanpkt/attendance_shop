@@ -1,17 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import {
-  MAX_GPS_ACCURACY_METERS,
   SETTINGS_API,
   getDistanceInMeters,
   getGeofenceRadius,
+  getMaxGpsAccuracyMeters,
+  shouldKeepGpsTolerance,
 } from "./utils/geo";
 
 function GPSLocation({ onLocationReady }) {
   const [loading, setLoading] = useState(true);
+  const [currentLatitude, setCurrentLatitude] = useState(null);
+  const [currentLongitude, setCurrentLongitude] = useState(null);
   const [currentAccuracy, setCurrentAccuracy] = useState(null);
   const [currentDistance, setCurrentDistance] = useState(null);
   const [officeRadius, setOfficeRadius] = useState(120);
+  const [maxAccuracy, setMaxAccuracy] = useState(120);
+  const [keepGpsTolerance, setKeepGpsTolerance] = useState(true);
   const [error, setError] = useState("");
 
   const onLocationReadyRef = useRef(onLocationReady);
@@ -67,13 +72,20 @@ function GPSLocation({ onLocationReady }) {
         longitude
       );
 
+      setCurrentLatitude(latitude);
+      setCurrentLongitude(longitude);
       setCurrentAccuracy(accuracy);
       setCurrentDistance(distance);
       setOfficeRadius(office.radius);
+      setMaxAccuracy(office.maxAccuracy);
+      setKeepGpsTolerance(office.keepGpsTolerance);
       setLoading(true);
       setError("");
 
-      if (accuracy > MAX_GPS_ACCURACY_METERS) {
+      if (
+        office.keepGpsTolerance &&
+        accuracy > office.maxAccuracy
+      ) {
         return;
       }
 
@@ -144,10 +156,18 @@ function GPSLocation({ onLocationReady }) {
           latitude,
           longitude,
           radius: getGeofenceRadius(),
+          maxAccuracy: getMaxGpsAccuracyMeters(
+            data?.accuracy
+          ),
+          keepGpsTolerance: shouldKeepGpsTolerance(
+            data?.gpsTolerance
+          ),
         };
 
         officeRef.current = office;
         setOfficeRadius(office.radius);
+        setMaxAccuracy(office.maxAccuracy);
+        setKeepGpsTolerance(office.keepGpsTolerance);
 
         if (!cancelled) {
           startWatching();
@@ -173,7 +193,8 @@ function GPSLocation({ onLocationReady }) {
     currentDistance != null &&
     currentDistance > officeRadius &&
     currentAccuracy != null &&
-    currentAccuracy <= MAX_GPS_ACCURACY_METERS;
+    (!keepGpsTolerance ||
+      currentAccuracy <= maxAccuracy);
 
   return (
     <div>
@@ -186,13 +207,48 @@ function GPSLocation({ onLocationReady }) {
                 ? "You are outside the office area"
                 : "Checking your location"}
             </strong>
-            <p>
-              {tooFar
-                ? `You are ${Math.round(currentDistance)} meters away. Move within ${Math.round(officeRadius)} meters of the office to punch.`
-                : currentAccuracy != null
-                ? `GPS accuracy: ${Math.round(currentAccuracy)}m. Need ${MAX_GPS_ACCURACY_METERS}m or better, and within ${Math.round(officeRadius)}m of the office.`
-                : `Please wait while we confirm you are within ${Math.round(officeRadius)} meters of the office.`}
-            </p>
+            {currentLatitude != null && currentLongitude != null ? (
+              <ul className="gps-live-stats">
+                <li>
+                  Latitude: {Number(currentLatitude).toFixed(6)}
+                </li>
+                <li>
+                  Longitude: {Number(currentLongitude).toFixed(6)}
+                </li>
+                <li>
+                  Accuracy: {Math.round(currentAccuracy)}m
+                  {keepGpsTolerance
+                    ? ` (need ${Math.round(maxAccuracy)}m or better)`
+                    : ""}
+                </li>
+                {currentDistance != null && (
+                  <li>
+                    Distance: {Math.round(currentDistance)}m
+                    {` (within ${Math.round(officeRadius)}m)`}
+                  </li>
+                )}
+              </ul>
+            ) : (
+              <p>
+                Waiting for GPS coordinates. Please wait while we
+                confirm you are within {Math.round(officeRadius)}{" "}
+                meters of the office.
+              </p>
+            )}
+            {tooFar && (
+              <p>
+                You are {Math.round(currentDistance)} meters away.
+                Move within {Math.round(officeRadius)} meters of
+                the office to punch.
+              </p>
+            )}
+            {!tooFar && currentAccuracy != null && (
+              <p>
+                {keepGpsTolerance
+                  ? `Comparing GPS. Need ${Math.round(maxAccuracy)}m accuracy or better, and within ${Math.round(officeRadius)}m of the office.`
+                  : `Comparing GPS. GPS tolerance is ignored. Stay within ${Math.round(officeRadius)}m of the office.`}
+              </p>
+            )}
           </div>
         </div>
       )}
