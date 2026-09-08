@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import {
-  SETTINGS_API,
+  fetchAttendanceSettings,
   getDistanceInMeters,
   getGeofenceRadius,
   getMaxGpsAccuracyMeters,
   shouldKeepGpsTolerance,
+  shouldSkipGpsCheck,
 } from "./utils/geo";
 
 function GPSLocation({ onLocationReady }) {
@@ -29,12 +30,6 @@ function GPSLocation({ onLocationReady }) {
   useEffect(() => {
     completedRef.current = false;
     let cancelled = false;
-
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by this browser.");
-      setLoading(false);
-      return;
-    }
 
     const stopWatching = () => {
       if (watchIdRef.current !== null) {
@@ -120,6 +115,12 @@ function GPSLocation({ onLocationReady }) {
     };
 
     const startWatching = () => {
+      if (!navigator.geolocation) {
+        setError("Geolocation is not supported by this browser.");
+        setLoading(false);
+        return;
+      }
+
       const options = {
         enableHighAccuracy: true,
         timeout: 20000,
@@ -135,9 +136,19 @@ function GPSLocation({ onLocationReady }) {
 
     const loadOfficeAndWatch = async () => {
       try {
-        const response = await fetch(SETTINGS_API);
-        const json = await response.json();
-        const data = json?.data;
+        const data = await fetchAttendanceSettings();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (shouldSkipGpsCheck(data?.gpsTolerance)) {
+          sendLocationToApp({
+            skipped: true,
+          });
+          return;
+        }
+
         const latitude = Number(data?.latitude);
         const longitude = Number(data?.longitude);
 
@@ -207,7 +218,9 @@ function GPSLocation({ onLocationReady }) {
             <strong>
               {tooFar
                 ? "You are outside the office area"
-                : "Checking your location"}
+                : currentLatitude != null
+                  ? "Checking your location"
+                  : "Loading punch settings"}
             </strong>
             {currentLatitude != null && currentLongitude != null ? (
               <ul className="gps-live-stats">

@@ -1,6 +1,19 @@
 export const SETTINGS_API =
   "https://attendance-backend-hs75.onrender.com/api/settings";
 
+export const fetchAttendanceSettings = async () => {
+  const response = await fetch(SETTINGS_API, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to load settings.");
+  }
+
+  const json = await response.json();
+  return json?.data || {};
+};
+
 export const DEFAULT_GEOFENCE_METERS = 30;
 
 export const MAX_GPS_ACCURACY_METERS = 30;
@@ -43,16 +56,32 @@ export const getGeofenceRadius = (tolerance) => {
 };
 
 export const shouldKeepGpsTolerance = (value) => {
+  return !shouldSkipGpsCheck(value);
+};
+
+export const shouldSkipGpsCheck = (value) => {
   if (
     value === false ||
     value === "false" ||
     value === 0 ||
     value === "0"
   ) {
-    return false;
+    return true;
   }
 
-  return true;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (
+      normalized === "off" ||
+      normalized === "ignore" ||
+      normalized === "no"
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 export const getMaxGpsAccuracyMeters = (

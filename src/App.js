@@ -1,5 +1,6 @@
 import React, {
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -10,6 +11,10 @@ import {
   deleteAttendanceImage,
   uploadAttendanceImage,
 } from "./services/uploadImage";
+import {
+  fetchAttendanceSettings,
+  shouldSkipGpsCheck,
+} from "./utils/geo";
 
 import "./App.scss";
 
@@ -25,6 +30,9 @@ function App() {
   // =========================================================
 
   const [location, setLocation] = useState(null);
+
+  const [checkingGpsSetting, setCheckingGpsSetting] =
+    useState(true);
 
   // =========================================================
   // PHOTO
@@ -112,6 +120,47 @@ function App() {
   // LOCATION READY
   // =========================================================
 
+  const skipGpsAndOpenCamera = useCallback(() => {
+    setLocation({
+      skipped: true,
+    });
+    setCameraResetKey((key) => key + 1);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadGpsSetting = async () => {
+      try {
+        const settings =
+          await fetchAttendanceSettings();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (shouldSkipGpsCheck(settings?.gpsTolerance)) {
+          skipGpsAndOpenCamera();
+        }
+      } catch (settingsError) {
+        console.error(
+          "GPS setting fetch error:",
+          settingsError
+        );
+      } finally {
+        if (!cancelled) {
+          setCheckingGpsSetting(false);
+        }
+      }
+    };
+
+    loadGpsSetting();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [skipGpsAndOpenCamera]);
+
   const handleLocationReady = useCallback(
     (locationData) => {
       console.log(
@@ -121,6 +170,12 @@ function App() {
       console.log(
         "LOCATION RECEIVED IN APP"
       );
+
+      if (locationData?.skipped) {
+        console.log("GPS check skipped");
+        skipGpsAndOpenCamera();
+        return;
+      }
 
       console.log(
         "Latitude:",
@@ -143,7 +198,7 @@ function App() {
 
       setLocation(locationData);
     },
-    []
+    [skipGpsAndOpenCamera]
   );
 
   // =========================================================
@@ -630,6 +685,8 @@ function App() {
         setSelfiePath(uploaded.path || null);
       }
 
+      const gpsSkipped = Boolean(location.skipped);
+
       const attendanceData = {
         mobileNumber:
           mobileNumber,
@@ -638,19 +695,25 @@ function App() {
           date,
 
         latitude:
-          Number(
-            location.latitude
-          ),
+          gpsSkipped
+            ? null
+            : Number(
+                location.latitude
+              ),
 
         longitude:
-          Number(
-            location.longitude
-          ),
+          gpsSkipped
+            ? null
+            : Number(
+                location.longitude
+              ),
 
         accuracy:
-          Number(
-            location.accuracy
-          ),
+          gpsSkipped
+            ? null
+            : Number(
+                location.accuracy
+              ),
 
         selfieUrl:
           punchSelfieUrl,
@@ -949,7 +1012,34 @@ function App() {
             GPS
         ================================================= */}
 
-        {!location && (
+        {checkingGpsSetting && !location && (
+          <section className="attendance-card">
+            <div className="card-header">
+              <div className="step-number">
+                1
+              </div>
+              <div>
+                <h2>
+                  Loading punch settings
+                </h2>
+                <p>
+                  Checking whether GPS is
+                  required.
+                </p>
+              </div>
+            </div>
+            <div className="location-container">
+              <div className="loading-box">
+                <div className="spinner"></div>
+                <p>
+                  Reading admin GPS setting...
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {!checkingGpsSetting && !location && (
           <section className="attendance-card">
 
             <div className="card-header">
@@ -997,7 +1087,7 @@ function App() {
             <div className="card-header">
 
               <div className="step-number">
-                2
+                {location.skipped ? 1 : 2}
               </div>
 
               <div>
@@ -1379,9 +1469,11 @@ function App() {
                     </strong>
 
                     <small>
-                      {location
-                        ? "Verified"
-                        : "Not available"}
+                      {location?.skipped
+                        ? "Skipped"
+                        : location
+                          ? "Verified"
+                          : "Not available"}
                     </small>
 
                   </div>
