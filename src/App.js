@@ -7,6 +7,7 @@ import React, {
 
 import GPSLocation from "./gps.jsx";
 import Camera from "./camera";
+import MonthlyAttendance from "./monthly";
 import {
   deleteAttendanceImage,
   uploadAttendanceImage,
@@ -31,8 +32,10 @@ function App() {
 
   const [location, setLocation] = useState(null);
 
+  const [screen, setScreen] = useState("menu");
+
   const [checkingGpsSetting, setCheckingGpsSetting] =
-    useState(true);
+    useState(false);
 
   // =========================================================
   // PHOTO
@@ -128,7 +131,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (screen !== "punch" || location) {
+      return undefined;
+    }
+
     let cancelled = false;
+    setCheckingGpsSetting(true);
 
     const loadGpsSetting = async () => {
       try {
@@ -159,7 +167,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [skipGpsAndOpenCamera]);
+  }, [screen, location, skipGpsAndOpenCamera]);
 
   const handleLocationReady = useCallback(
     (locationData) => {
@@ -920,6 +928,23 @@ function App() {
   // CLOSE RESPONSE DIALOG
   // =========================================================
 
+  const goHome = () => {
+    if (
+      submitting ||
+      checkingStatus ||
+      uploadingPhoto
+    ) {
+      return;
+    }
+
+    setShowPhotoDialog(false);
+    setShowMobileDialog(false);
+    setMobileNumber("");
+    setEmployee(null);
+    setAttendanceStatus(null);
+    setScreen("menu");
+  };
+
   const closeResponseDialog = () => {
     setResponseDialog({
       show: false,
@@ -1007,12 +1032,77 @@ function App() {
 
       <main className="attendance-main">
 
+        {screen === "menu" && (
+          <section className="attendance-card home-menu">
+            <div className="card-header">
+              <div>
+                <h2>Choose an option</h2>
+                <p>
+                  Punch today&apos;s attendance or
+                  view the month.
+                </p>
+              </div>
+            </div>
+
+            <div className="home-options">
+              <button
+                type="button"
+                className="home-option"
+                onClick={() => {
+                  if (!location) {
+                    setCheckingGpsSetting(true);
+                  }
+                  setScreen("punch");
+                }}
+              >
+                <span className="home-option-icon">
+                  📸
+                </span>
+                <strong>Click for attendance</strong>
+                <small>
+                  Take a selfie and punch in or out
+                </small>
+              </button>
+
+              <button
+                type="button"
+                className="home-option"
+                onClick={() => setScreen("monthly")}
+              >
+                <span className="home-option-icon">
+                  📅
+                </span>
+                <strong>
+                  Show monthly attendance
+                </strong>
+                <small>
+                  See your punches for the month
+                </small>
+              </button>
+            </div>
+          </section>
+        )}
+
+        {screen === "monthly" && (
+          <MonthlyAttendance onBack={goHome} />
+        )}
+
         {/* =================================================
             STEP 1
             GPS
         ================================================= */}
 
-        {checkingGpsSetting && !location && (
+        {screen === "punch" && (
+          <button
+            type="button"
+            className="punch-back"
+            onClick={goHome}
+          >
+            ← Back
+          </button>
+        )}
+
+        {screen === "punch" && checkingGpsSetting && !location && (
           <section className="attendance-card">
             <div className="card-header">
               <div className="step-number">
@@ -1039,7 +1129,7 @@ function App() {
           </section>
         )}
 
-        {!checkingGpsSetting && !location && (
+        {screen === "punch" && !checkingGpsSetting && !location && (
           <section className="attendance-card">
 
             <div className="card-header">
@@ -1081,7 +1171,7 @@ function App() {
             CAMERA
         ================================================= */}
 
-        {location && (
+        {screen === "punch" && location && (
           <section className="attendance-card">
 
             <div className="card-header">
