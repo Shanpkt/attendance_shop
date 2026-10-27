@@ -34,6 +34,9 @@ function App() {
 
   const [screen, setScreen] = useState("menu");
 
+  const [showMonthlyOption, setShowMonthlyOption] =
+    useState(false);
+
   const [checkingGpsSetting, setCheckingGpsSetting] =
     useState(false);
 
@@ -128,6 +131,47 @@ function App() {
       skipped: true,
     });
     setCameraResetKey((key) => key + 1);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMonthlyOption = async () => {
+      try {
+        const settings =
+          await fetchAttendanceSettings();
+
+        if (cancelled) {
+          return;
+        }
+
+        const visible =
+          settings?.showMonthlyAttendance === true;
+
+        setShowMonthlyOption(visible);
+
+        if (!visible) {
+          setScreen((current) =>
+            current === "monthly" ? "menu" : current
+          );
+        }
+      } catch (settingsError) {
+        console.error(
+          "Monthly attendance setting error:",
+          settingsError
+        );
+
+        if (!cancelled) {
+          setShowMonthlyOption(false);
+        }
+      }
+    };
+
+    loadMonthlyOption();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1038,8 +1082,9 @@ function App() {
               <div>
                 <h2>Choose an option</h2>
                 <p>
-                  Punch today&apos;s attendance or
-                  view the month.
+                  {showMonthlyOption
+                    ? "Punch today's attendance or view the month."
+                    : "Punch today's attendance."}
                 </p>
               </div>
             </div>
@@ -1064,21 +1109,23 @@ function App() {
                 </small>
               </button>
 
-              <button
-                type="button"
-                className="home-option"
-                onClick={() => setScreen("monthly")}
-              >
-                <span className="home-option-icon">
-                  📅
-                </span>
-                <strong>
-                  Show monthly attendance
-                </strong>
-                <small>
-                  See your punches for the month
-                </small>
-              </button>
+              {showMonthlyOption && (
+                <button
+                  type="button"
+                  className="home-option"
+                  onClick={() => setScreen("monthly")}
+                >
+                  <span className="home-option-icon">
+                    📅
+                  </span>
+                  <strong>
+                    Show monthly attendance
+                  </strong>
+                  <small>
+                    See your punches for the month
+                  </small>
+                </button>
+              )}
             </div>
           </section>
         )}
