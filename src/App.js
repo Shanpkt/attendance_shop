@@ -25,6 +25,66 @@ const API_URL =
 const EMPLOYEES_API_URL =
   "https://attendance-backend-hs75.onrender.com/api/employees";
 
+const formatPunchWait = (remainingMs) => {
+  const totalMinutes = Math.ceil(remainingMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours} hr ${minutes} min`;
+  }
+
+  if (hours > 0) {
+    return `${hours} hr`;
+  }
+
+  return `${Math.max(totalMinutes, 1)} min`;
+};
+
+const getPunchOutLock = (
+  employee,
+  attendanceStatus,
+  now
+) => {
+  if (attendanceStatus?.status !== "Punched In") {
+    return null;
+  }
+
+  const minHours =
+    Number(employee?.minPunchGapHours) ||
+    Number(attendanceStatus?.minPunchGapHours) ||
+    0;
+
+  const punchInTime =
+    attendanceStatus?.data?.punchIn?.timestamp;
+
+  if (minHours <= 0 || !punchInTime) {
+    return null;
+  }
+
+  const allowedAt =
+    new Date(punchInTime).getTime() +
+    minHours * 60 * 60 * 1000;
+
+  if (Number.isNaN(allowedAt)) {
+    return null;
+  }
+
+  const remainingMs = allowedAt - now;
+
+  if (remainingMs <= 0) {
+    return null;
+  }
+
+  return {
+    minHours,
+    remainingMs,
+    message: `Punch out is locked for ${minHours} hour${
+      minHours === 1 ? "" : "s"
+    } after punch in. Please wait ${formatPunchWait(remainingMs)}.`,
+  };
+};
+
 function App() {
   // =========================================================
   // LOCATION
@@ -86,6 +146,10 @@ function App() {
   const [employee, setEmployee] =
     useState(null);
 
+  const [clockNow, setClockNow] = useState(
+    () => Date.now()
+  );
+
   // =========================================================
   // SUBMITTING
   // =========================================================
@@ -125,6 +189,20 @@ function App() {
   // =========================================================
   // LOCATION READY
   // =========================================================
+
+  useEffect(() => {
+    if (!showMobileDialog) {
+      return undefined;
+    }
+
+    setClockNow(Date.now());
+
+    const timer = setInterval(() => {
+      setClockNow(Date.now());
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, [showMobileDialog]);
 
   const skipGpsAndOpenCamera = useCallback(() => {
     setLocation({
@@ -185,7 +263,11 @@ function App() {
     const loadGpsSetting = async () => {
       try {
         const settings =
-          await fetchAttendanceSettings();
+          await fetchAttendanceSettings(
+            employee?.workspace === "company"
+              ? "company"
+              : "shop"
+          );
 
         if (cancelled) {
           return;
@@ -211,7 +293,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, location, skipGpsAndOpenCamera]);
+  }, [screen, location, skipGpsAndOpenCamera, employee?.workspace]);
 
   const handleLocationReady = useCallback(
     (locationData) => {
@@ -539,6 +621,12 @@ function App() {
         name: matchedEmployee.name,
         mobileNumber:
           matchedEmployee.mobileNumber,
+        workspace:
+          matchedEmployee.workspace === "company"
+            ? "company"
+            : "shop",
+        minPunchGapHours:
+          Number(matchedEmployee.minPunchGapHours) || 0,
       });
 
       await checkAttendanceStatus(number);
@@ -579,6 +667,12 @@ function App() {
   // ACTION TEXT
   // =========================================================
 
+  const punchOutLock = getPunchOutLock(
+    employee,
+    attendanceStatus,
+    clockNow
+  );
+
   const getActionText = () => {
     if (checkingStatus) {
       return "Checking...";
@@ -602,6 +696,12 @@ function App() {
       attendanceStatus.status ===
       "Punched In"
     ) {
+      if (punchOutLock) {
+        return `Wait ${formatPunchWait(
+          punchOutLock.remainingMs
+        )}`;
+      }
+
       return "Punch Out";
     }
 
@@ -634,6 +734,17 @@ function App() {
   // =========================================================
 
   const submitAttendance = async () => {
+    const activeLock = getPunchOutLock(
+      employee,
+      attendanceStatus,
+      Date.now()
+    );
+
+    if (activeLock) {
+      showError(activeLock.message, "Punch Out Locked");
+      return;
+    }
+
     // -------------------------------------------------------
     // VALIDATE MOBILE
     // -------------------------------------------------------
@@ -1203,6 +1314,11 @@ function App() {
             <div className="location-container">
 
               <GPSLocation
+                workspace={
+                  employee?.workspace === "company"
+                    ? "company"
+                    : "shop"
+                }
                 onLocationReady={
                   handleLocationReady
                 }
@@ -1551,8 +1667,9 @@ function App() {
                         </strong>
 
                         <p>
-                          Your next action
-                          will be Punch Out.
+                          {punchOutLock
+                            ? punchOutLock.message
+                            : "Your next action will be Punch Out."}
                         </p>
 
                       </div>
@@ -1704,7 +1821,8 @@ function App() {
                   employee?.registered !==
                     true ||
                   attendanceStatus?.status ===
-                    "Punched Out"
+                    "Punched Out" ||
+                  Boolean(punchOutLock)
                 }
               >
 

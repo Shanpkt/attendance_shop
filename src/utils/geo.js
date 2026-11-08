@@ -1,8 +1,17 @@
 export const SETTINGS_API =
   "https://attendance-backend-hs75.onrender.com/api/settings";
 
-export const fetchAttendanceSettings = async () => {
-  const response = await fetch(SETTINGS_API, {
+export const fetchAttendanceSettings = async (
+  workspace = "shop"
+) => {
+  const safeWorkspace =
+    workspace === "company" ? "company" : "shop";
+
+  const url = `${SETTINGS_API}?workspace=${encodeURIComponent(
+    safeWorkspace
+  )}`;
+
+  const response = await fetch(url, {
     cache: "no-store",
   });
 

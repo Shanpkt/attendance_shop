@@ -9,7 +9,10 @@ import {
   shouldSkipGpsCheck,
 } from "./utils/geo";
 
-function GPSLocation({ onLocationReady }) {
+function GPSLocation({
+  onLocationReady,
+  workspace = "shop",
+}) {
   const [loading, setLoading] = useState(true);
   const [currentLatitude, setCurrentLatitude] = useState(null);
   const [currentLongitude, setCurrentLongitude] = useState(null);
@@ -136,7 +139,9 @@ function GPSLocation({ onLocationReady }) {
 
     const loadOfficeAndWatch = async () => {
       try {
-        const data = await fetchAttendanceSettings();
+        const data = await fetchAttendanceSettings(
+          workspace
+        );
 
         if (cancelled) {
           return;
@@ -200,7 +205,7 @@ function GPSLocation({ onLocationReady }) {
       cancelled = true;
       stopWatching();
     };
-  }, []);
+  }, [workspace]);
 
   const tooFar =
     currentDistance != null &&
